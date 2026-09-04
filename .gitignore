@@ -1,0 +1,28 @@
+# Ambientes Virtuais
+.venv/
+env/
+venv/
+ENV/
+
+# Byte-compiled / cache do Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Binários pesados locais (o app baixa automaticamente pelo botão ou usa do PATH)
+bin/
+*.exe
+*.zip
+
+# Configuração local do usuário
+config.json
+
+# IDEs e Editores
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Arquivos temporários de teste e logs
+*.log
+tests/temp_config.json

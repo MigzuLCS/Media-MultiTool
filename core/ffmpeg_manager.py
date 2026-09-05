@@ -10,13 +10,14 @@ from pathlib import Path
 from typing import Optional, Dict, Any, Callable
 from PIL import Image, ImageOps
 from core.config import config
+from core.paths import get_app_root
 
 
 class FFmpegManager:
     """Gerencia a detecção, inspeção e execução de comandos FFmpeg e ffprobe."""
 
     def __init__(self):
-        self.app_root = Path(__file__).resolve().parent.parent
+        self.app_root = get_app_root()
         self.bin_dir = self.app_root / "bin"
         self._frame_cache = {}
         self._cache_lock = threading.Lock()

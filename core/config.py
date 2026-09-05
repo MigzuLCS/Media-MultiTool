@@ -1,6 +1,9 @@
 import os
 import json
 from pathlib import Path
+from typing import Optional
+
+from core.paths import get_config_dir
 
 DEFAULT_CONFIG = {
     "theme": "dark",
@@ -9,14 +12,14 @@ DEFAULT_CONFIG = {
     "auto_cleanup_temp": True,
 }
 
-CONFIG_FILE = Path(__file__).resolve().parent.parent / "config.json"
+CONFIG_FILE = get_config_dir() / "config.json"
 
 
 class ConfigManager:
     """Gerencia as preferências e configurações persistentes do aplicativo."""
 
-    def __init__(self, config_path: Path = CONFIG_FILE):
-        self.config_path = config_path
+    def __init__(self, config_path: Optional[Path] = None):
+        self.config_path = config_path if config_path is not None else (get_config_dir() / "config.json")
         self._config = dict(DEFAULT_CONFIG)
         self.load()
 

@@ -50,6 +50,36 @@ python run.py
 
 ---
 
+## 📦 Como Distribuir para Outras Pessoas (Sem Python)
+
+Para compartilhar o aplicativo com outras pessoas que **não têm Python instalado**:
+
+### 1. Download Pronto (Releases do GitHub)
+Nas [Releases do GitHub](https://github.com/MigzuLCS/Media-MultiTool/releases), os usuários podem baixar diretamente:
+- **`Media-MultiTool-Setup.exe`**: Instalador clássico do Windows (instala sem precisar de permissões de administrador, cria atalhos no Menu Iniciar e Desktop, e adiciona desinstalador).
+- **`Media-MultiTool-Windows-x64.zip`**: Versão portátil (basta descompactar em qualquer pasta e abrir o `Media MultiTool.exe`).
+
+### 2. Gerar Versão Portátil Localmente
+Basta dar dois cliques no arquivo:
+```cmd
+build.bat
+```
+Ou executar pelo terminal:
+```powershell
+python build_portable.py
+```
+Isso gera a pasta `dist/Media MultiTool` e o arquivo `dist/Media-MultiTool-Windows-x64.zip` prontos para envio.
+
+### 3. Publicar Nova Versão na Nuvem Automaticamente (GitHub Actions)
+O repositório já possui uma automação de CI/CD pronta (`.github/workflows/release.yml`). Para lançar uma nova versão para os usuários:
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+O GitHub compilará o executável e o instalador na nuvem e atualizará a página de download automaticamente!
+
+---
+
 ## 🧩 Como Adicionar Novas Funcionalidades (Extensibilidade)
 
 O Media MultiTool foi projetado desde o primeiro dia para permitir a adição de novas ferramentas sem precisar modificar as telas existentes:

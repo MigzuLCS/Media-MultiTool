@@ -7,6 +7,7 @@ from typing import Dict, Optional
 
 from core.config import config
 from core.ffmpeg_manager import ffmpeg_manager
+from core.paths import get_assets_dir
 from features import AVAILABLE_FEATURES
 from features.base import BaseFeature
 
@@ -31,7 +32,7 @@ class MainWindow(ctk.CTk):
         self.minsize(860, 580)
 
         # Configurar ícone da janela
-        icon_path = Path(__file__).resolve().parent.parent / "assets" / "icon.ico"
+        icon_path = get_assets_dir() / "icon.ico"
         if icon_path.exists():
             try:
                 self.iconbitmap(str(icon_path))

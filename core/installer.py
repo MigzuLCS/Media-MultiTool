@@ -6,6 +6,7 @@ import urllib.request
 import threading
 from pathlib import Path
 from typing import Optional, Callable
+from core.paths import get_app_root
 
 
 class FFmpegInstaller:
@@ -14,7 +15,7 @@ class FFmpegInstaller:
     FFMPEG_RELEASE_URL = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
 
     def __init__(self):
-        self.app_root = Path(__file__).resolve().parent.parent
+        self.app_root = get_app_root()
         self.bin_dir = self.app_root / "bin"
 
     def download_and_extract(

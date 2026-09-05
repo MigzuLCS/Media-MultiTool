@@ -35,6 +35,12 @@ class MainWindow(ctk.CTk):
         self.sidebar_buttons: Dict[str, ctk.CTkButton] = {}
         self.current_feature_id: Optional[str] = None
 
+        # Fila thread-safe para comunicação entre threads de segundo plano e a interface gráfica
+        import queue
+        self._gui_queue = queue.Queue()
+        self.bind("<<DispatchGUI>>", self._process_gui_queue)
+        self._poll_gui_queue()
+
         self._build_sidebar()
         self._build_content_area()
 
@@ -142,3 +148,27 @@ class MainWindow(ctk.CTk):
             messagebox.showinfo(title, message, parent=self)
         else:
             messagebox.showinfo(title, message, parent=self)
+
+    def dispatch_gui(self, callback):
+        """Executa um callback de forma 100% thread-safe na thread da interface gráfica."""
+        self._gui_queue.put(callback)
+
+    def _poll_gui_queue(self):
+        try:
+            if not self.winfo_exists():
+                return
+            self._process_gui_queue()
+            if self.winfo_exists():
+                self.after(25, self._poll_gui_queue)
+        except Exception:
+            pass
+
+    def _process_gui_queue(self, event=None):
+        while not self._gui_queue.empty():
+            try:
+                fn = self._gui_queue.get_nowait()
+                fn()
+            except Exception as e:
+                import traceback
+                print(f"[GUI Dispatch Error] {e}")
+                traceback.print_exc()

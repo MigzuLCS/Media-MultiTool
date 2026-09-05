@@ -240,13 +240,13 @@ class CompressTab(BaseFeature):
             )
 
         def on_prog(frac, msg):
-            self.frame.after(0, lambda: self.progress_card.update_progress(frac, msg))
+            self.dispatch_gui(lambda: self.progress_card.update_progress(frac, msg))
 
         def on_succ(res):
-            self.frame.after(0, lambda: self._on_success(res))
+            self.dispatch_gui(lambda: self._on_success(res))
 
         def on_err(exc):
-            self.frame.after(0, lambda: self._on_error(exc))
+            self.dispatch_gui(lambda: self._on_error(exc))
 
         task_manager.run_task(
             name="video_compression",

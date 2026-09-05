@@ -38,6 +38,8 @@ class TestConfigManager(unittest.TestCase):
 class TestMediaTransformerUtils(unittest.TestCase):
     def test_parse_time_to_seconds(self):
         self.assertEqual(media_transformer._parse_time_to_seconds("00:01:30"), 90.0)
+        self.assertEqual(media_transformer._parse_time_to_seconds("00:01:30.500"), 90.5)
+        self.assertEqual(media_transformer._parse_time_to_seconds("00:01:30,250"), 90.25)
         self.assertEqual(media_transformer._parse_time_to_seconds("01:00:00"), 3600.0)
         self.assertEqual(media_transformer._parse_time_to_seconds("02:15"), 135.0)
         self.assertEqual(media_transformer._parse_time_to_seconds("45"), 45.0)

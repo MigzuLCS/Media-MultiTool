@@ -156,13 +156,13 @@ class SettingsTab(BaseFeature):
         self.progress_card.reset("Iniciando download do pacote estático...")
 
         def on_prog(frac, msg):
-            self.frame.after(0, lambda: self.progress_card.update_progress(frac, msg))
+            self.dispatch_gui(lambda: self.progress_card.update_progress(frac, msg))
 
         def on_succ(res):
-            self.frame.after(0, lambda: self._on_download_success())
+            self.dispatch_gui(lambda: self._on_download_success())
 
         def on_err(exc):
-            self.frame.after(0, lambda: self._on_download_error(exc))
+            self.dispatch_gui(lambda: self._on_download_error(exc))
 
         task_manager.run_task(
             name="ffmpeg_install",

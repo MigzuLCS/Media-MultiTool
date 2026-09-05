@@ -49,3 +49,15 @@ class BaseFeature(ABC):
         """Exibe mensagem de sucesso na janela principal."""
         if hasattr(self.main_window, "show_toast"):
             self.main_window.show_toast(title, message, "success")
+
+    def dispatch_gui(self, callback):
+        """Executa um callback de forma segura na thread principal da GUI."""
+        if hasattr(self.main_window, "dispatch_gui"):
+            self.main_window.dispatch_gui(callback)
+        elif self.frame:
+            try:
+                self.frame.after(0, callback)
+            except Exception:
+                callback()
+        else:
+            callback()

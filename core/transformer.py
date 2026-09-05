@@ -11,8 +11,8 @@ class MediaTransformer:
 
     @staticmethod
     def _parse_time_to_seconds(time_str: str) -> float:
-        """Converte strings no formato HH:MM:SS ou MM:SS ou segundos para float."""
-        time_str = time_str.strip()
+        """Converte strings no formato HH:MM:SS.mmm ou MM:SS.mmm ou segundos para float."""
+        time_str = time_str.strip().replace(",", ".")
         parts = time_str.split(":")
         try:
             if len(parts) == 3:
@@ -81,35 +81,68 @@ class MediaTransformer:
         output_path: str,
         start_time: str,
         end_time: str,
-        lossless: bool = True,
+        lossless: bool = False,
         on_progress: Optional[Callable[[float, str], None]] = None,
         cancel_event: Optional[threading.Event] = None,
     ) -> str:
-        """Corta um trecho de vídeo. Modo lossless é instantâneo (-c copy)."""
+        """Corta um trecho de vídeo com precisão exata de frame e milissegundo."""
         t_start = self._parse_time_to_seconds(start_time)
         t_end = self._parse_time_to_seconds(end_time)
-        trim_duration = max(0.1, t_end - t_start) if t_end > t_start else 1.0
+        trim_duration = max(0.001, t_end - t_start) if t_end > t_start else 1.0
+
+        start_str = f"{t_start:.3f}"
+        dur_str = f"{trim_duration:.3f}"
+
+        info = ffmpeg_manager.get_media_info(input_path)
+        has_video = info.get("has_video", False)
+        out_ext = Path(output_path).suffix.lower()
 
         if lossless:
-            # Modo ultra-rápido sem recodificação
+            # Modo ultra-rápido por keyframes (-c copy)
             args = [
-                "-ss", start_time,
-                "-to", end_time,
+                "-ss", start_str,
                 "-i", input_path,
+                "-t", dur_str,
                 "-c", "copy",
                 "-map", "0",
                 output_path,
             ]
-        else:
-            # Modo preciso com recodificação
+        elif not has_video:
+            # Mídia de áudio puro
+            if out_ext == ".mp3":
+                audio_codec = "libmp3lame"
+            elif out_ext in [".wav", ".wave"]:
+                audio_codec = "pcm_s16le"
+            elif out_ext in [".m4a", ".aac"]:
+                audio_codec = "aac"
+            elif out_ext in [".ogg", ".oga"]:
+                audio_codec = "libvorbis"
+            elif out_ext in [".flac"]:
+                audio_codec = "flac"
+            else:
+                audio_codec = "copy"
+
             args = [
-                "-ss", start_time,
-                "-to", end_time,
+                "-ss", start_str,
                 "-i", input_path,
+                "-t", dur_str,
+                "-vn",
+                "-c:a", audio_codec,
+            ]
+            if audio_codec not in ["copy", "pcm_s16le", "flac"]:
+                args += ["-b:a", "192k"]
+            args.append(output_path)
+        else:
+            # Modo preciso com recodificação de frame exato para vídeos
+            args = [
+                "-ss", start_str,
+                "-i", input_path,
+                "-t", dur_str,
                 "-c:v", "libx264",
                 "-crf", "18",
                 "-preset", "fast",
                 "-c:a", "aac",
+                "-b:a", "192k",
                 output_path,
             ]
 

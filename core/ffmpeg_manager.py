@@ -3,10 +3,12 @@ import sys
 import shutil
 import json
 import re
+import io
 import subprocess
 import threading
 from pathlib import Path
 from typing import Optional, Dict, Any, Callable
+from PIL import Image, ImageOps
 from core.config import config
 
 
@@ -16,6 +18,8 @@ class FFmpegManager:
     def __init__(self):
         self.app_root = Path(__file__).resolve().parent.parent
         self.bin_dir = self.app_root / "bin"
+        self._frame_cache = {}
+        self._cache_lock = threading.Lock()
 
     def get_ffmpeg_path(self) -> Optional[str]:
         """Localiza o executável do ffmpeg."""
@@ -121,6 +125,12 @@ class FFmpegManager:
             video_stream = next((s for s in streams if s.get("codec_type") == "video"), None)
             audio_stream = next((s for s in streams if s.get("codec_type") == "audio"), None)
 
+            if duration <= 0.0:
+                for s in streams:
+                    d = float(s.get("duration", 0.0))
+                    if d > duration:
+                        duration = d
+
             width = int(video_stream.get("width", 0)) if video_stream else 0
             height = int(video_stream.get("height", 0)) if video_stream else 0
             size_bytes = int(fmt.get("size", Path(file_path).stat().st_size if Path(file_path).exists() else 0))
@@ -195,6 +205,18 @@ class FFmpegManager:
             creationflags=creation_flags,
         )
 
+        stderr_lines = []
+
+        def _drain_stderr():
+            try:
+                for sline in iter(proc.stderr.readline, ""):
+                    stderr_lines.append(sline)
+            except Exception:
+                pass
+
+        err_thread = threading.Thread(target=_drain_stderr, daemon=True)
+        err_thread.start()
+
         time_pattern = re.compile(r"out_time_ms=(\d+)")
         progress_done = False
 
@@ -228,16 +250,157 @@ class FFmpegManager:
                     progress_done = True
 
             retcode = proc.wait()
+            err_thread.join(timeout=1.0)
             if retcode == 0:
                 if on_progress:
                     on_progress(1.0, "Concluído com sucesso!")
                 return True
             else:
-                stderr_output = proc.stderr.read()
+                stderr_output = "".join(stderr_lines)
                 raise RuntimeError(f"FFmpeg encerrou com código {retcode}: {stderr_output[-400:]}")
         finally:
             if proc.poll() is None:
                 proc.kill()
+            try:
+                proc.stdout.close()
+            except Exception:
+                pass
+            try:
+                proc.stderr.close()
+            except Exception:
+                pass
+
+    def extract_frame(
+        self,
+        file_path: str,
+        timestamp_sec: float,
+        width: int = 240,
+        height: int = 135,
+    ) -> Optional[Image.Image]:
+        """Extrai um frame único de um arquivo de vídeo em uma posição de tempo específica."""
+        ffmpeg = self.get_ffmpeg_path()
+        if not ffmpeg or not Path(file_path).exists():
+            return None
+
+        cache_key = (str(file_path), round(max(0.0, timestamp_sec), 1), width, height)
+        with self._cache_lock:
+            if cache_key in self._frame_cache:
+                return self._frame_cache[cache_key]
+
+        scale_filter = f"scale={width}:{height}:force_original_aspect_ratio=decrease:force_divisible_by=2"
+        creation_flags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+
+        s = max(0.0, timestamp_sec)
+        candidates = [s]
+        if s > 0.3:
+            candidates.append(max(0.0, s - 0.25))
+
+        for target_time in candidates:
+            h = int(target_time // 3600)
+            m = int((target_time % 3600) // 60)
+            sec = target_time % 60
+            time_str = f"{h:02d}:{m:02d}:{sec:05.2f}"
+
+            cmd = [
+                ffmpeg,
+                "-ss", time_str,
+                "-i", file_path,
+                "-frames:v", "1",
+                "-vf", scale_filter,
+                "-f", "image2pipe",
+                "-vcodec", "mjpeg",
+                "pipe:1",
+            ]
+
+            try:
+                res = subprocess.run(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.DEVNULL,
+                    creationflags=creation_flags,
+                    check=False,
+                    timeout=3.5,
+                )
+                if res.stdout:
+                    raw_img = Image.open(io.BytesIO(res.stdout)).convert("RGB")
+                    img = ImageOps.pad(raw_img, (width, height), color=(18, 18, 18))
+                    with self._cache_lock:
+                        if len(self._frame_cache) > 120:
+                            keys = list(self._frame_cache.keys())[:60]
+                            for k in keys:
+                                del self._frame_cache[k]
+                        self._frame_cache[cache_key] = img
+                    return img
+            except Exception:
+                continue
+
+        return None
+
+    def extract_audio_waveform(
+        self,
+        file_path: str,
+        width: int = 700,
+        height: int = 135,
+        color: str = "#3B82F6",
+        raw_rgba: bool = False,
+    ) -> Optional[Image.Image]:
+        """Gera um gráfico visual da forma de onda / variação de volume do áudio usando showwavespic."""
+        ffmpeg = self.get_ffmpeg_path()
+        if not ffmpeg or not Path(file_path).exists():
+            return None
+
+        cache_key = (str(file_path), "waveform_raw" if raw_rgba else "waveform", width, height, color)
+        with self._cache_lock:
+            if cache_key in self._frame_cache:
+                return self._frame_cache[cache_key]
+
+        creation_flags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+        cmd = [
+            ffmpeg,
+            "-vn",
+            "-i", str(file_path),
+            "-filter_complex", f"[0:a]aformat=channel_layouts=mono,showwavespic=s={width}x{height}:colors={color}[v]",
+            "-map", "[v]",
+            "-frames:v", "1",
+            "-f", "image2pipe",
+            "-vcodec", "png",
+            "pipe:1",
+        ]
+
+        try:
+            res = subprocess.run(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                creationflags=creation_flags,
+                check=False,
+                timeout=10.0,
+            )
+            if res.stdout:
+                raw_img = Image.open(io.BytesIO(res.stdout)).convert("RGBA")
+                if raw_rgba:
+                    with self._cache_lock:
+                        if len(self._frame_cache) > 120:
+                            keys = list(self._frame_cache.keys())[:60]
+                            for k in keys:
+                                del self._frame_cache[k]
+                        self._frame_cache[cache_key] = raw_img
+                    return raw_img
+
+                # Compor sobre fundo escuro elegante
+                bg = Image.new("RGBA", (width, height), (20, 20, 24, 255))
+                final_img = Image.alpha_composite(bg, raw_img).convert("RGB")
+                with self._cache_lock:
+                    if len(self._frame_cache) > 120:
+                        keys = list(self._frame_cache.keys())[:60]
+                        for k in keys:
+                            del self._frame_cache[k]
+                    self._frame_cache[cache_key] = final_img
+                return final_img
+        except Exception:
+            pass
+
+        return None
 
 
 ffmpeg_manager = FFmpegManager()

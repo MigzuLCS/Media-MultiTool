@@ -38,8 +38,12 @@ class FileSelector(ctk.CTkFrame):
             font=ctk.CTkFont(size=12),
         )
         self.path_entry.pack(side="left", fill="x", expand=True, padx=(0, 8))
+        self._last_notified_path = default_path
         if default_path:
             self.path_entry.insert(0, default_path)
+
+        self.path_entry.bind("<Return>", lambda e: self._on_entry_commit())
+        self.path_entry.bind("<FocusOut>", lambda e: self._on_entry_commit())
 
         self.browse_btn = ctk.CTkButton(
             self.input_frame,
@@ -69,10 +73,18 @@ class FileSelector(ctk.CTkFrame):
             self.set_path(selected)
 
     def set_path(self, path: str):
+        self._last_notified_path = path
         self.path_entry.delete(0, "end")
         self.path_entry.insert(0, path)
         if self.on_change:
             self.on_change(path)
+
+    def _on_entry_commit(self):
+        current = self.get_path()
+        if current and current != self._last_notified_path:
+            self._last_notified_path = current
+            if self.on_change:
+                self.on_change(current)
 
     def get_path(self) -> str:
         return self.path_entry.get().strip()

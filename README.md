@@ -20,13 +20,25 @@ Desenvolvido em **Python** com **CustomTkinter**, integrado nativamente ao **yt-
 
 ## 🛠️ Como Iniciar o Aplicativo
 
-### Opção 1: Inicialização com 1 Clique (Windows)
-Basta dar um duplo-clique no arquivo:
+### Opção 1: Pesquisa do Windows ou Área de Trabalho (Mais Rápido)
+- Pressione a tecla **Windows** no teclado e digite `Media MultiTool`.
+- Ou abra o atalho **Media MultiTool** na sua Área de Trabalho (`Desktop`).
+
+> Se os atalhos ainda não estiverem criados, basta executar `criar_atalho.bat` uma vez.
+
+### Opção 2: Pelo Executável Direto
+Dê um duplo clique diretamente no inicializador na raiz da pasta:
+```cmd
+Media MultiTool.exe
+```
+*(Inicia o aplicativo instantaneamente e em segundo plano, sem janela preta de terminal).*
+
+### Opção 3: Script de Inicialização
 ```cmd
 start.bat
 ```
 
-### Opção 2: Pelo Terminal
+### Opção 4: Pelo Terminal
 Certifique-se de usar o ambiente virtual do projeto:
 ```powershell
 # Ativar o ambiente virtual

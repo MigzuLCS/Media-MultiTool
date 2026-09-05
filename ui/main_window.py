@@ -1,5 +1,6 @@
 import os
 import sys
+from pathlib import Path
 import customtkinter as ctk
 from tkinter import messagebox
 from typing import Dict, Optional
@@ -14,12 +15,28 @@ class MainWindow(ctk.CTk):
     """Janela principal do Media MultiTool com barra lateral dinâmica e modular."""
 
     def __init__(self):
+        # Identidade do processo no Windows (para ícone próprio na barra de tarefas)
+        if sys.platform == "win32":
+            try:
+                import ctypes
+                ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("MigzuLCS.MediaMultiTool.1.0")
+            except Exception:
+                pass
+
         super().__init__()
 
         # Configurações iniciais da janela
         self.title("Media MultiTool — Central de Mídia Desktop")
         self.geometry("1020x700")
         self.minsize(860, 580)
+
+        # Configurar ícone da janela
+        icon_path = Path(__file__).resolve().parent.parent / "assets" / "icon.ico"
+        if icon_path.exists():
+            try:
+                self.iconbitmap(str(icon_path))
+            except Exception:
+                pass
 
         # Aplicar tema salvo
         theme = config.get("theme", "dark")

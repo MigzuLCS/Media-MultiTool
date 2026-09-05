@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - 'v*'
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -29,6 +31,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Setup FFmpeg Binaries
+        run: |
+          python -c "from core.installer import FFmpegInstaller; FFmpegInstaller().download_and_extract()"
+
       - name: Run Unit Tests
         run: |
           python -m unittest discover tests
@@ -45,21 +51,18 @@ jobs:
         run: |
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\MediaMultiTool.iss
 
-      - name: Create GitHub Release
+      - name: Upload Assets to GitHub Release
         uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'release'
         with:
           files: |
             dist/Media-MultiTool-Windows-x64.zip
             dist/Media-MultiTool-Setup.exe
-          name: "Media MultiTool ${{ github.ref_name }}"
           generate_release_notes: true
-          draft: false
-          prerelease: false
 
       - name: Upload Artifacts (Manual Run)
         uses: actions/upload-artifact@v4
-        if: "!startsWith(github.ref, 'refs/tags/')"
+        if: "!startsWith(github.ref, 'refs/tags/') && github.event_name != 'release'"
         with:
           name: Media-MultiTool-Windows-Build
           path: |

@@ -5,6 +5,10 @@ from core.ffmpeg_manager import ffmpeg_manager
 from core.transformer import media_transformer
 
 class TestFFmpegTrimIntegration(unittest.TestCase):
+    def setUp(self):
+        if not ffmpeg_manager.is_available():
+            self.skipTest("FFmpeg não disponível neste ambiente.")
+
     def test_ffmpeg_cut(self):
         test_dir = Path("tests/temp_media")
         test_dir.mkdir(parents=True, exist_ok=True)

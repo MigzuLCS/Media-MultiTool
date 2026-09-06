@@ -10,7 +10,7 @@ Desenvolvido em **Python** com **CustomTkinter**, integrado nativamente ao **yt-
 
 | Módulo | Descrição | Destaques Técnicos |
 | :--- | :--- | :--- |
-| **📥 YouTube Downloader** | Baixe vídeos ou extraia apenas o áudio diretamente do YouTube e plataformas compatíveis. | Qualidades (Melhor, 1080p, 720p, 480p), extração em MP3 a 192kbps, estimativa de tempo e velocidade em tempo real. |
+| **📥 Downloader Universal** | Baixe vídeos ou extraia áudios com tags e capas de YouTube, Spotify, TikTok, Instagram, Twitter/X e mais. | Suporte a links do Spotify (sem API), auto-tagging de gênero musical via MusicBrainz + FFmpeg, seleção de qualidade até 1080p+, MP3 a 192kbps com capa embutida. |
 | **📉 Compressor de Vídeo** | Reduza o tamanho de vídeos pesados para caber nos limites de upload. | Presets prontos para **Discord (25 MB)**, **WhatsApp (16 MB)**, **Email (10 MB)**, **Nitro (50 MB)** ou tamanho customizado. Codecs H.264 ou H.265. |
 | **✂️ Corte Rápido** | Isole trechos específicos definindo tempo inicial e final. | **Modo Lossless Instantâneo (`-c copy`)**: processa em menos de 1 segundo e mantém 100% da qualidade original sem reencodar. |
 | **🔄 Conversor de Formatos** | Transforme vídeos em GIFs de alta fidelidade ou extraia faixas sonoras. | **MP4 $\to$ GIF** com filtro de paleta em 2 passos (`palettegen`/`paletteuse`) sem bordas granuladas; **Vídeo $\to$ MP3** (128 a 320 kbps); **Vídeo $\to$ WAV**; remuxing de containers. |

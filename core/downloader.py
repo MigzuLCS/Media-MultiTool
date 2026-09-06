@@ -3,6 +3,7 @@ import sys
 import threading
 from pathlib import Path
 from typing import Optional, Callable, Dict, Any
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 import yt_dlp
 
 from core.ffmpeg_manager import ffmpeg_manager
@@ -15,15 +16,87 @@ class YouTubeDownloader:
     def __init__(self):
         pass
 
+    @staticmethod
+    def clean_url(url: str) -> str:
+        """
+        Remove parâmetros de playlist, mix e rastreamento de URLs do YouTube quando há um vídeo individual especificado.
+        Isso evita downloads em loops infinitos causados por listas automáticas de mix (ex: YouTube Mix, list=RD...).
+        """
+        if not url or not isinstance(url, str):
+            return ""
+        url = url.strip()
+        try:
+            parsed = urlparse(url)
+            if not parsed.scheme:
+                parsed = urlparse("https://" + url)
+
+            netloc = parsed.netloc.lower()
+            yt_domains = (
+                "youtube.com",
+                "www.youtube.com",
+                "m.youtube.com",
+                "music.youtube.com",
+                "gaming.youtube.com",
+                "youtu.be",
+            )
+            is_youtube = any(netloc == d or netloc.endswith("." + d) for d in yt_domains)
+            if is_youtube:
+                query = parse_qs(parsed.query, keep_blank_values=True)
+                path_parts = [p for p in parsed.path.split("/") if p]
+
+                # Identifica se a URL aponta para um vídeo individual
+                has_video = False
+                if "v" in query and query["v"]:
+                    has_video = True
+                elif "youtu.be" in netloc and path_parts:
+                    has_video = True
+                elif path_parts and path_parts[0] in ("shorts", "live", "embed") and len(path_parts) > 1:
+                    has_video = True
+
+                if has_video:
+                    # Remove parâmetros de playlist, mix e navegação contínua
+                    params_to_remove = {"list", "index", "start_radio", "pp", "si", "feature"}
+                    filtered_query = {k: v for k, v in query.items() if k not in params_to_remove}
+                    new_query = urlencode(filtered_query, doseq=True)
+                    return urlunparse(parsed._replace(query=new_query))
+        except Exception:
+            pass
+        return url
+
+    @staticmethod
+    def is_playlist_url(url: str) -> bool:
+        """Verifica se a URL aponta exclusivamente para uma playlist sem vídeo individual."""
+        if not url or not isinstance(url, str):
+            return False
+        try:
+            parsed = urlparse(url.strip())
+            if not parsed.scheme:
+                parsed = urlparse("https://" + url.strip())
+            path = parsed.path.lower().rstrip("/")
+            if path == "/playlist" or path.endswith("/playlist"):
+                return True
+        except Exception:
+            pass
+        return False
+
     def get_info(self, url: str) -> Dict[str, Any]:
         """Obtém metadados do vídeo sem realizar download."""
+        clean_target = self.clean_url(url)
+        if self.is_playlist_url(url):
+            raise ValueError("O link informado aponta para uma playlist. Por favor, insira o link de um vídeo individual.")
+
         ydl_opts = {
             "quiet": True,
             "no_warnings": True,
             "skip_download": True,
+            "noplaylist": True,
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
+            info = ydl.extract_info(clean_target, download=False)
+            if info and "entries" in info:
+                entries = [e for e in info.get("entries", []) if e]
+                if entries:
+                    info = entries[0]
             return {
                 "title": info.get("title", "Sem título"),
                 "duration": info.get("duration", 0),
@@ -53,6 +126,10 @@ class YouTubeDownloader:
         Returns:
             Caminho do arquivo gerado ou mensagem de sucesso.
         """
+        clean_target = self.clean_url(url)
+        if self.is_playlist_url(url):
+            raise ValueError("O link informado aponta para uma playlist completa. Por favor, utilize o link de um vídeo ou música individual.")
+
         ffmpeg_bin = ffmpeg_manager.get_ffmpeg_path()
         out_template = str(Path(output_dir) / "%(title)s.%(ext)s")
 
@@ -86,6 +163,7 @@ class YouTubeDownloader:
             "progress_hooks": [hook],
             "quiet": True,
             "no_warnings": True,
+            "noplaylist": True,
         }
 
         if ffmpeg_bin:
@@ -117,7 +195,11 @@ class YouTubeDownloader:
             })
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
+            info = ydl.extract_info(clean_target, download=True)
+            if info and "entries" in info:
+                entries = [e for e in info.get("entries", []) if e]
+                if entries:
+                    info = entries[0]
             filename = ydl.prepare_filename(info)
             if mode == "audio":
                 filename = str(Path(filename).with_suffix(".mp3"))

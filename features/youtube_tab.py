@@ -154,6 +154,20 @@ class YouTubeTab(BaseFeature):
             self.show_error("URL Vazia", "Por favor, insira o link de um vídeo do YouTube.")
             return
 
+        # Limpa parâmetros de mix / playlist caso a URL aponte para um vídeo individual
+        cleaned_url = youtube_downloader.clean_url(url)
+        if cleaned_url != url:
+            self.url_entry.delete(0, "end")
+            self.url_entry.insert(0, cleaned_url)
+            url = cleaned_url
+
+        if youtube_downloader.is_playlist_url(url):
+            self.show_error(
+                "Link de Playlist Não Suportado",
+                "O link inserido aponta para uma playlist completa. Por favor, utilize o link de um vídeo ou música individual."
+            )
+            return
+
         out_dir = self.output_selector.get_path()
         if not out_dir or not Path(out_dir).exists():
             self.show_error("Pasta Inválida", "A pasta de destino especificada não existe.")

@@ -1,20 +1,23 @@
 import os
+import threading
 from pathlib import Path
 import customtkinter as ctk
 
 from features.base import BaseFeature
 from ui.components.file_selector import FileSelector
 from ui.components.progress_card import ProgressCard
+from ui.components.duplicate_dialog import DuplicateConflictDialog
 from core.downloader import youtube_downloader
 from core.tasks import task_manager
 from core.config import config
 
 
+
 class YouTubeTab(BaseFeature):
     id = "youtube"
-    title = "Downloader Web"
+    title = "Download de Mídia"
     icon = "📥"
-    description = "Baixe vídeos e músicas de YouTube, Spotify, TikTok, Instagram, Twitter/X e mais."
+    description = "Obtenha cópias de mídias online públicas ou autorizadas para arquivamento e reprodução offline."
 
     def render(self, parent: ctk.CTkFrame) -> ctk.CTkFrame:
         self.frame = ctk.CTkScrollableFrame(parent, fg_color="transparent")
@@ -23,7 +26,7 @@ class YouTubeTab(BaseFeature):
         # Cabeçalho da aba
         title_lbl = ctk.CTkLabel(
             self.frame,
-            text="📥 Downloader Universal da Web",
+            text="📥 Download de Mídia Online",
             font=ctk.CTkFont(size=20, weight="bold"),
             anchor="w",
         )
@@ -31,7 +34,7 @@ class YouTubeTab(BaseFeature):
 
         desc_lbl = ctk.CTkLabel(
             self.frame,
-            text="Baixe vídeos em alta resolução ou extraia áudio MP3 com capas e tags de gênero automáticas.",
+            text="Obtenha vídeos ou extraia faixas sonoras de mídias online públicas, autorizadas ou de domínio público.",
             font=ctk.CTkFont(size=12),
             text_color="gray",
             anchor="w",
@@ -61,35 +64,27 @@ class YouTubeTab(BaseFeature):
         )
         self.platform_badge.pack(side="right")
 
-        self.playlist_btn = ctk.CTkButton(
-            url_header,
-            text="📑 Baixar Playlist",
-            font=ctk.CTkFont(size=11, weight="bold"),
-            height=26,
-            corner_radius=6,
-            fg_color=("#1f6aa5", "#144870"),
-            hover_color=("#144870", "#0e3350"),
-            command=self._download_playlist_click,
-        )
-        # O botão permanece desempacotado até uma playlist ser detectada na URL
-
         self.url_entry = ctk.CTkEntry(
             self.frame,
-            placeholder_text="https://... (YouTube, Spotify, TikTok, Instagram, Twitter/X, etc.)",
+            placeholder_text="https://... (Cole a URL da mídia pública ou autorizada aqui)",
             font=ctk.CTkFont(size=13),
             height=38,
         )
         self.url_entry.pack(fill="x", pady=(0, 6))
         self.url_entry.bind("<KeyRelease>", lambda e: self._on_url_input_changed())
 
-        # Chips visuais com plataformas suportadas
-        chips_frame = ctk.CTkFrame(self.frame, fg_color="transparent")
-        chips_frame.pack(fill="x", pady=(0, 16))
-        supported_platforms = ["YouTube", "Spotify", "TikTok", "Instagram", "X (Twitter)", "Reddit", "Twitch"]
-        for p in supported_platforms:
+        # Barra de apoio abaixo da URL: Categorias à esquerda e Opções de Playlist à direita
+        url_sub_bar = ctk.CTkFrame(self.frame, fg_color="transparent")
+        url_sub_bar.pack(fill="x", pady=(0, 16))
+
+        # Indicadores de formatos e categorias suportadas (lado esquerdo)
+        chips_frame = ctk.CTkFrame(url_sub_bar, fg_color="transparent")
+        chips_frame.pack(side="left")
+        supported_categories = ["Vídeos Web", "Áudios & Podcasts", "Domínio Público", "Uso Pessoal"]
+        for cat in supported_categories:
             chip = ctk.CTkLabel(
                 chips_frame,
-                text=p,
+                text=cat,
                 font=ctk.CTkFont(size=11),
                 text_color="gray",
                 fg_color=("gray90", "gray20"),
@@ -98,6 +93,41 @@ class YouTubeTab(BaseFeature):
                 pady=1,
             )
             chip.pack(side="left", padx=(0, 6))
+
+        # Opções de Playlist na direita e abaixo do campo de URL (desempacotado até detecção)
+        self.playlist_options_frame = ctk.CTkFrame(url_sub_bar, fg_color="transparent")
+
+        self.playlist_limit_lbl = ctk.CTkLabel(
+            self.playlist_options_frame,
+            text="Limite: 20 faixas",
+            font=ctk.CTkFont(size=11),
+            text_color="gray",
+        )
+        self.playlist_limit_lbl.pack(side="left", padx=(0, 6))
+
+        self.playlist_slider = ctk.CTkSlider(
+            self.playlist_options_frame,
+            from_=1,
+            to=30,
+            number_of_steps=29,
+            width=110,
+            height=16,
+            command=self._on_playlist_slider_change,
+        )
+        self.playlist_slider.set(20)
+        self.playlist_slider.pack(side="left", padx=(0, 8))
+
+        self.playlist_btn = ctk.CTkButton(
+            self.playlist_options_frame,
+            text="📑 Baixar Playlist (20)",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            height=28,
+            corner_radius=6,
+            fg_color=("#1f6aa5", "#144870"),
+            hover_color=("#144870", "#0e3350"),
+            command=self._download_playlist_click,
+        )
+        self.playlist_btn.pack(side="left")
 
         # Configurações de Formato e Qualidade
         opts_frame = ctk.CTkFrame(self.frame)
@@ -181,50 +211,73 @@ class YouTubeTab(BaseFeature):
         )
         self.progress_card.pack(fill="x", pady=(0, 10))
 
+        # Aviso Legal e de Uso Responsável
+        disclaimer_frame = ctk.CTkFrame(self.frame, fg_color=("gray90", "gray18"), corner_radius=6)
+        disclaimer_frame.pack(fill="x", pady=(8, 0))
+        ctk.CTkLabel(
+            disclaimer_frame,
+            text="⚖️ Aviso Legal: Ferramenta destinada exclusivamente para arquivamento e uso pessoal de conteúdos próprios, de domínio público ou autorizados. O usuário é o único responsável pelo cumprimento dos direitos autorais e termos de cada serviço.",
+            font=ctk.CTkFont(size=11),
+            text_color=("gray40", "gray60"),
+            wraplength=650,
+            justify="left",
+            anchor="w",
+        ).pack(fill="x", padx=12, pady=8)
+
         return self.frame
+
+    def _on_playlist_slider_change(self, value):
+        limit = int(round(value))
+        self.playlist_limit_lbl.configure(text=f"Limite: {limit} faixas")
+        url = self.url_entry.get().strip()
+        if youtube_downloader.is_mix_playlist(url):
+            self.playlist_btn.configure(text=f"📑 Baixar Mix ({limit})")
+        else:
+            self.playlist_btn.configure(text=f"📑 Baixar Playlist ({limit})")
 
     def _on_url_input_changed(self):
         url = self.url_entry.get().strip()
         plat = youtube_downloader.detect_platform(url)
 
         if plat == "spotify":
-            self.platform_badge.configure(text="🟢 Spotify (Áudio)", text_color="#1DB954")
-            self.playlist_btn.pack_forget()
+            self.platform_badge.configure(text="🟢 Faixa de Áudio", text_color="#1DB954")
+            self.playlist_options_frame.pack_forget()
             if self.mode_var.get() != "audio":
                 self.mode_selector.set("Áudio (MP3)")
                 self._on_mode_change("Áudio (MP3)")
         elif plat == "youtube":
-            self.platform_badge.configure(text="🔴 YouTube", text_color="#FF4444")
-            # Exibe o botão de playlist na região do cabeçalho se houver playlist/mix na URL
-            if youtube_downloader.has_playlist(url):
+            self.platform_badge.configure(text="🔴 Vídeo Web", text_color="#FF4444")
+            # Exibe as opções de playlist abaixo e à direita da URL se houver playlist/mix
+            if youtube_downloader.has_playlist(url) or youtube_downloader.is_playlist_url(url):
+                limit = int(round(self.playlist_slider.get()))
                 if youtube_downloader.is_mix_playlist(url):
-                    self.playlist_btn.configure(text="📑 Baixar Mix (Máx 20 faixas)")
+                    self.playlist_btn.configure(text=f"📑 Baixar Mix ({limit})")
                 else:
-                    self.playlist_btn.configure(text="📑 Baixar Playlist Completa")
-                self.playlist_btn.pack(side="right", padx=(0, 8))
+                    self.playlist_btn.configure(text=f"📑 Baixar Playlist ({limit})")
+                self.playlist_options_frame.pack(side="right")
             else:
-                self.playlist_btn.pack_forget()
+                self.playlist_options_frame.pack_forget()
         elif plat == "tiktok":
-            self.platform_badge.configure(text="⚫ TikTok", text_color="#00F2FE")
-            self.playlist_btn.pack_forget()
+            self.platform_badge.configure(text="⚫ Vídeo Curto", text_color="#00F2FE")
+            self.playlist_options_frame.pack_forget()
         elif plat == "instagram":
-            self.platform_badge.configure(text="🟣 Instagram", text_color="#E1306C")
-            self.playlist_btn.pack_forget()
+            self.platform_badge.configure(text="🟣 Mídia Social", text_color="#E1306C")
+            self.playlist_options_frame.pack_forget()
         elif plat == "twitter_x":
-            self.platform_badge.configure(text="🐦 Twitter / X", text_color="#1DA1F2")
-            self.playlist_btn.pack_forget()
+            self.platform_badge.configure(text="🐦 Vídeo Social", text_color="#1DA1F2")
+            self.playlist_options_frame.pack_forget()
         elif plat == "reddit":
-            self.platform_badge.configure(text="🟠 Reddit", text_color="#FF4500")
-            self.playlist_btn.pack_forget()
+            self.platform_badge.configure(text="🟠 Fórum Web", text_color="#FF4500")
+            self.playlist_options_frame.pack_forget()
         elif plat == "twitch":
-            self.platform_badge.configure(text="🟣 Twitch", text_color="#9146FF")
-            self.playlist_btn.pack_forget()
+            self.platform_badge.configure(text="🟣 Transmissão Ao Vivo", text_color="#9146FF")
+            self.playlist_options_frame.pack_forget()
         elif plat == "soundcloud":
-            self.platform_badge.configure(text="🟠 SoundCloud", text_color="#FF5500")
-            self.playlist_btn.pack_forget()
+            self.platform_badge.configure(text="🟠 Faixa de Áudio", text_color="#FF5500")
+            self.playlist_options_frame.pack_forget()
         else:
-            self.platform_badge.configure(text="🌐 Web / Universal", text_color=("gray40", "gray70"))
-            self.playlist_btn.pack_forget()
+            self.platform_badge.configure(text="🌐 Link Web / Universal", text_color=("gray40", "gray70"))
+            self.playlist_options_frame.pack_forget()
 
     def _on_mode_change(self, value: str):
         if "Áudio" in value:
@@ -279,13 +332,55 @@ class YouTubeTab(BaseFeature):
         btn_text = "Baixando Playlist..." if is_playlist else "Baixando..."
         self.action_btn.configure(state="disabled", text=btn_text)
         self.playlist_btn.configure(state="disabled")
+        self.playlist_slider.configure(state="disabled")
         self.progress_card.reset("Conectando ao servidor...")
 
         mode = self.mode_var.get()
         quality = self.quality_var.get()
         auto_tag = self.auto_tag_var.get()
+        playlist_limit = int(round(self.playlist_slider.get())) if is_playlist else 20
 
         def task_target(on_progress=None, cancel_event=None):
+            collision_strategy = "auto"
+
+            # Pré-verificação para Mídia Individual
+            if not is_playlist:
+                if on_progress:
+                    on_progress(0.02, "Verificando arquivos na pasta de destino...")
+
+                try:
+                    predicted = youtube_downloader.predict_output_path(
+                        url=url,
+                        output_dir=out_dir,
+                        mode=mode,
+                    )
+                except Exception:
+                    predicted = None
+
+                if predicted and predicted.exists() and predicted.stat().st_size > 10240:
+                    decision_holder = {"choice": "skip"}
+                    dialog_event = threading.Event()
+
+                    def show_dialog():
+                        choice = DuplicateConflictDialog.ask_resolution(
+                            master=self.frame,
+                            filename=predicted.name,
+                            folder=out_dir,
+                        )
+                        decision_holder["choice"] = choice
+                        dialog_event.set()
+
+                    self.dispatch_gui(show_dialog)
+                    dialog_event.wait()
+                    user_choice = decision_holder["choice"]
+
+                    if user_choice == "skip":
+                        if on_progress:
+                            on_progress(1.0, f"Download cancelado: o arquivo '{predicted.name}' já existe na pasta.")
+                        return str(predicted)
+
+                    collision_strategy = user_choice
+
             return youtube_downloader.download(
                 url=url,
                 output_dir=out_dir,
@@ -293,6 +388,8 @@ class YouTubeTab(BaseFeature):
                 quality=quality,
                 auto_tag=auto_tag,
                 is_playlist=is_playlist,
+                playlist_limit=playlist_limit,
+                collision_strategy=collision_strategy,
                 on_progress=on_progress,
                 cancel_event=cancel_event,
             )
@@ -317,6 +414,7 @@ class YouTubeTab(BaseFeature):
     def _on_success(self, filepath: str):
         self.action_btn.configure(state="normal", text="Baixar Mídia Agora")
         self.playlist_btn.configure(state="normal")
+        self.playlist_slider.configure(state="normal")
         p = Path(filepath)
         if p.is_dir():
             self.show_success("Download Concluído", f"Playlist salva com sucesso na pasta:\n{filepath}")
@@ -326,6 +424,7 @@ class YouTubeTab(BaseFeature):
     def _on_error(self, exc: Exception):
         self.action_btn.configure(state="normal", text="Baixar Mídia Agora")
         self.playlist_btn.configure(state="normal")
+        self.playlist_slider.configure(state="normal")
         self.progress_card.update_progress(0.0, "Erro durante o download.")
         self.show_error("Erro no Download", str(exc))
 
@@ -333,3 +432,4 @@ class YouTubeTab(BaseFeature):
         task_manager.cancel_task("media_download")
         self.action_btn.configure(state="normal", text="Baixar Mídia Agora")
         self.playlist_btn.configure(state="normal")
+        self.playlist_slider.configure(state="normal")

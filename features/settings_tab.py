@@ -133,6 +133,37 @@ class SettingsTab(BaseFeature):
             command=self._change_default_dir,
         ).pack(side="right")
 
+        # Seção Aviso Legal / Isenção de Responsabilidade
+        legal_card = ctk.CTkFrame(self.frame)
+        legal_card.pack(fill="x", pady=(0, 16), padx=2)
+
+        ctk.CTkLabel(
+            legal_card,
+            text="⚖️ Isenção de Responsabilidade e Termos de Uso:",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            anchor="w",
+        ).pack(fill="x", padx=14, pady=(12, 6))
+
+        disclaimer_lines = [
+            "• Finalidade Educacional e Pessoal: O Media MultiTool é um software livre utilitário para manipulação, conversão e arquivamento pessoal de mídias.",
+            "• Sem Hospedagem: O aplicativo não armazena, hospeda, distribui nem retransmite mídias em servidores próprios. Todo processamento ocorre localmente na máquina do usuário.",
+            "• Ausência de Vínculo: O projeto não possui qualquer filiação, parceria, patrocínio ou endosso de plataformas de streaming ou redes sociais de terceiros.",
+            "• Responsabilidade do Usuário: O usuário é o único responsável por garantir que as mídias processadas sejam de domínio público, de sua autoria ou expressamente autorizadas, observando a legislação de direitos autorais (como a Lei 9.610/98) e os termos de serviço aplicáveis.",
+        ]
+        for line in disclaimer_lines:
+            ctk.CTkLabel(
+                legal_card,
+                text=line,
+                font=ctk.CTkFont(size=11),
+                text_color="gray",
+                wraplength=650,
+                justify="left",
+                anchor="w",
+            ).pack(fill="x", padx=14, pady=(0, 4))
+
+        # Espaçamento inferior no card
+        ctk.CTkFrame(legal_card, height=6, fg_color="transparent").pack()
+
         self._refresh_ffmpeg_status()
         return self.frame
 

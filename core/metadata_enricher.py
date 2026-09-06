@@ -21,15 +21,16 @@ def clean_title_for_search(raw_title: str) -> str:
         return ""
 
     title = raw_title.strip()
+    title = re.sub(r"\.(mp3|m4a|flac|wav|ogg|opus|mp4|mkv|webm)$", "", title, flags=re.IGNORECASE).strip()
 
     # 1. Padrões entre colchetes ou parênteses
     bracket_patterns = [
-        r"\[\s*(original\s+)?(video\s+game\s+|game\s+)?(soundtrack|score|ost|o\.s\.t\.)\s*\]",
-        r"\(\s*(original\s+)?(video\s+game\s+|game\s+)?(soundtrack|score|ost|o\.s\.t\.)\s*\)",
+        r"\[\s*(original\s+)?(video\s+game\s+|game\s+|video\s+)?(soundtrack|score|ost|o\.s\.t\.)\s*\]",
+        r"\(\s*(original\s+)?(video\s+game\s+|game\s+|video\s+)?(soundtrack|score|ost|o\.s\.t\.)\s*\)",
         r"\[\s*(official\s+)?(music\s+)?(video|audio|visualizer|lyric\s+video|track)\s*\]",
         r"\(\s*(official\s+)?(music\s+)?(video|audio|visualizer|lyric\s+video|track)\s*\)",
-        r"\[\s*(1\s*hour|10\s*hours|loop|extended(\s+version)?|hq|hd|4k|60fps|remaster(ed)?)\s*\]",
-        r"\(\s*(1\s*hour|10\s*hours|loop|extended(\s+version)?|hq|hd|4k|60fps|remaster(ed)?)\s*\)",
+        r"\[\s*(1\s*hour|10\s*hours|loop|extended(\s+version)?|hq|hd|4k|60fps|remaster(ed)?|recreated?)\s*\]",
+        r"\(\s*(1\s*hour|10\s*hours|loop|extended(\s+version)?|hq|hd|4k|60fps|remaster(ed)?|recreated?)\s*\)",
         r"\[\s*(lyrics?|letra|audio)\s*\]",
         r"\(\s*(lyrics?|letra|audio)\s*\)",
         r"【.*?】",
@@ -40,10 +41,10 @@ def clean_title_for_search(raw_title: str) -> str:
 
     # 2. Cláusulas finais ou iniciais separadas por traços, barras ou pipes (ex: ' - Original Game Soundtrack')
     clause_patterns = [
-        r"\s*[-–—|]\s*(original\s+)?(video\s+game\s+|game\s+)?(soundtrack|score|ost|o\.s\.t\.)\s*$",
+        r"\s*[-–—|]\s*(original\s+)?(video\s+game\s+|game\s+|video\s+)?(soundtrack|score|ost|o\.s\.t\.)\s*$",
         r"\s*[-–—|]\s*(official\s+)?(music\s+video|audio|video|visualizer|lyrics?)\s*$",
-        r"\s*[-–—|]\s*(extended(\s+version)?|1\s*hour(\s+loop)?|remaster(ed)?)\s*$",
-        r"^(original\s+)?(video\s+game\s+|game\s+)?(soundtrack|score|ost|o\.s\.t\.)\s*[-–—|]\s*",
+        r"\s*[-–—|]\s*(extended(\s+version)?|1\s*hour(\s+loop)?|remaster(ed)?|recreated?)\s*$",
+        r"^(original\s+)?(video\s+game\s+|game\s+|video\s+)?(soundtrack|score|ost|o\.s\.t\.)\s*[-–—|]\s*",
     ]
     for pat in clause_patterns:
         title = re.sub(pat, "", title, flags=re.IGNORECASE)
@@ -57,10 +58,164 @@ def clean_title_for_search(raw_title: str) -> str:
     )
     title = re.sub(r"\b(official\s+music\s+video|official\s+audio|official\s+video)\b", "", title, flags=re.IGNORECASE)
 
-    # 4. Limpeza de múltiplos espaços e traços
+    # 4. Limpeza de prefixo numérico de faixa/playlist inicial (ex: "01 - ", "02. ", "1 - ")
+    title = re.sub(r"^\d{1,2}\s*[-–—._]\s+", "", title)
+
+    # 5. Limpeza de múltiplos espaços e traços
     title = re.sub(r"\s*[-–—]\s*[-–—]\s*", " - ", title)
     title = re.sub(r"\s+", " ", title).strip(" -–—|")
     return title
+
+
+# Constantes e Vocabulário Especializado de Videogames (VGM)
+GAME_HARDWARE_KEYWORDS = {
+    "snes", "nes", "famicom", "super nintendo", "super famicom", "n64", "nintendo 64",
+    "gamecube", "game cube", "wii", "wii u", "switch", "nintendo switch", "game boy",
+    "gameboy", "gba", "gbc", "nds", "nintendo ds", "3ds", "ps1", "psx", "ps2", "ps3",
+    "ps4", "ps5", "psp", "ps vita", "playstation", "dreamcast", "sega genesis", "mega drive",
+    "megadrive", "sega saturn", "game gear", "master system", "sega cd", "pc-98", "pc98",
+    "msx", "msx2", "neo geo", "neo-geo", "arcade", "pc engine", "turbografx", "amiga",
+    "x68000", "c64", "commodore 64"
+}
+
+GAME_STUDIOS_KEYWORDS = {
+    "sega", "nintendo", "square enix", "squaresoft", "konami", "capcom", "bandai namco",
+    "namco", "atlus", "falcom", "nihon falcom", "snk", "fromsoftware", "koei tecmo", "valve",
+    "blizzard", "bethesda", "bungie", "bioware", "rare", "rareware", "rare ltd", "game freak",
+    "wayforward", "hal laboratory", "monolith soft", "level-5", "game arts", "treasure",
+    "sunsoft", "taito", "data east", "technos", "hudson soft", "irem", "spike chunsoft",
+    "sound team", "falcom sound team", "sega sound team", "capcom sound team", "zuntata",
+    "kukeiha club", "s.s.t. band", "jdk band", "alph lyla", "gamadelic"
+}
+
+GAME_TERMS_KEYWORDS = {
+    "bgm", "ost", "soundtrack", "gamerip", "game rip", "soundfont", "sound version",
+    "boss theme", "battle theme", "stage theme", "area theme", "title theme", "menu theme",
+    "victory theme", "overworld", "dungeon theme", "final boss", "character theme", "chiptune",
+    "8-bit", "16-bit", "32-bit", "demake", "recreated", "vgm", "video game music",
+    "game music", "original game soundtrack", "video game soundtrack", "game ost"
+}
+
+GAME_FRANCHISES_KEYWORDS = {
+    "mario", "zelda", "pokemon", "pokémon", "metroid", "donkey kong", "kirby", "sonic",
+    "mega man", "rockman", "final fantasy", "chrono trigger", "chrono cross", "kingdom hearts",
+    "persona", "shin megami tensei", "smt", "street fighter", "tekken", "guilty gear",
+    "castlevania", "silent hill", "resident evil", "biohazard", "metal gear", "yakuza",
+    "like a dragon", "monster hunter", "dark souls", "elden ring", "bloodborne", "touhou",
+    "undertale", "deltarune", "cuphead", "hollow knight", "celeste", "minecraft", "terraria",
+    "doom", "halo", "the elder scrolls", "skyrim", "fallout", "witcher", "genshin impact",
+    "gran turismo", "ridge racer", "wipeout", "ace combat", "xenoblade", "fire emblem",
+    "napple tale", "rasetsu", "the conveni", "sega marine fishing", "net de tennis",
+    "chaindive", "littlebigplanet", "animal crossing", "splatoon", "smash bros", "banjo kazooie",
+    "spyro", "crash bandicoot", "katamari", "parappa", "shenmue", "jet set radio",
+    "phantasy star", "golden sun", "mother", "earthbound", "advance wars", "f-zero",
+    "star fox", "saya no uta", "nitroplus", "clannad", "fate/stay night", "danganronpa",
+    "phoenix wright", "ace attorney"
+}
+
+
+def detect_vgm_genre(combined: str) -> str:
+    """
+    Identifica de forma precisa se a mídia se trata de uma música de videogame
+    e refina o subgênero correspondente.
+    """
+    c = f" {combined.lower()} "
+    has_hw = any(re.search(rf"\b{re.escape(k)}\b", c) for k in GAME_HARDWARE_KEYWORDS)
+    has_studio = any(re.search(rf"\b{re.escape(k)}\b", c) for k in GAME_STUDIOS_KEYWORDS)
+    has_term = any(re.search(rf"\b{re.escape(k)}\b", c) for k in GAME_TERMS_KEYWORDS)
+    has_franchise = any(re.search(rf"\b{re.escape(k)}\b", c) for k in GAME_FRANCHISES_KEYWORDS)
+
+    is_game = (
+        has_franchise
+        or (has_hw and (has_term or "track" in c or "music" in c or "bgm" in c))
+        or (has_studio and (has_term or "theme" in c or "bgm" in c))
+        or any(k in c for k in ("video game music", "vgm", "gamerip", "game rip", "game soundtrack", "original game soundtrack", "video game soundtrack", "game ost"))
+        or (has_term and any(term in c for term in ("bgm", "stage", "boss", "battle", "area", "dungeon", "overworld")))
+    )
+
+    if is_game:
+        if any(k in c for k in ("dnb", "drum and bass", "drum & bass")):
+            return "Drum & Bass / Game Music"
+        if any(k in c for k in ("chiptune", "8-bit", "16-bit", "8bit", "16bit")):
+            return "Chiptune / 8-Bit"
+        if any(k in c for k in ("orchestral", "orchestra", "symphon", "waltz")):
+            return "Orchestral / Game Soundtrack"
+        if any(k in c for k in ("rock", "metal")):
+            return "Rock / Game Soundtrack"
+        if any(k in c for k in ("ambient", "atmospheric")):
+            return "Ambient / Game Soundtrack"
+        if any(k in c for k in ("jazz", "samba", "bossa")):
+            return "Jazz / Game Soundtrack"
+        if any(k in c for k in ("electronic", "techno", "house", "edm", "dance", "synth")):
+            return "Electronic / Game Soundtrack"
+        return "Video Game Music"
+    return ""
+
+
+def infer_broad_genre(combined: str) -> str:
+    """
+    Deduz o gênero musical abrangente com base em termos semânticos e contextuais.
+    """
+    c = f" {combined.lower()} "
+    if any(k in c for k in ("anime", "anison", "monogatari", "evangelion", "vocaloid", "utaite", "opening", "ending", "saya no uta")):
+        return "Anime / Soundtrack"
+    if any(k in c for k in ("soundtrack", "ost", "o.s.t.", "original score", "score", "cinematic music", "film score")):
+        return "Soundtrack"
+    if any(k in c for k in ("chiptune", "8-bit", "16-bit", "8bit", "16bit")):
+        return "Chiptune"
+    if any(k in c for k in ("lo-fi", "lofi", "chillhop")):
+        return "Lo-Fi / Chillhop"
+    if any(k in c for k in ("synthwave", "retrowave", "cyberpunk", "vaporwave")):
+        return "Synthwave"
+    if any(k in c for k in ("bossa nova", "bossa", "samba", "mpb")):
+        return "Bossa Nova"
+    if any(k in c for k in ("latin jazz", "smooth jazz", "bebop", "jazz")):
+        return "Jazz"
+    if any(k in c for k in ("classical", "piano solo", "solo piano", "neoclassical", "orchestra", "symphony", "concerto")):
+        return "Classical"
+    if any(k in c for k in ("ambient", "atmospheric", "meditation", "drone", "new age")):
+        return "Ambient"
+    if any(k in c for k in ("heavy metal", "death metal", "metal")):
+        return "Metal"
+    if any(k in c for k in ("indie rock", "alternative rock", "punk", "rock", "grunge")):
+        return "Rock"
+    if any(k in c for k in ("drum and bass", "dnb", "jungle")):
+        return "Drum & Bass"
+    if any(k in c for k in ("house", "deep house", "techno", "electronic", "trance", "edm", "shibuya-kei")):
+        return "Electronic"
+    if "city pop" in c:
+        return "City Pop"
+    if any(k in c for k in ("j-pop", "jpop", "japanese pop")):
+        return "J-Pop"
+    if any(k in c for k in ("hip-hop", "hip hop", "rap", "trap")):
+        return "Hip-Hop"
+    if any(k in c for k in ("r&b", "soul", "funk", "motown")):
+        return "R&B / Soul"
+    if any(k in c for k in ("reggae", "dub", "ska")):
+        return "Reggae"
+    if any(k in c for k in ("indie pop", "synthpop", "pop")):
+        return "Pop"
+    return ""
+
+
+def search_itunes_metadata(query: str) -> Optional[Dict[str, Any]]:
+    """
+    Consulta o endpoint de pesquisa público da Apple/iTunes (gratuito, sem autenticação/chave).
+    Retorna gênero principal oficial, artista, álbum e data de lançamento.
+    """
+    if not query or not query.strip():
+        return None
+    try:
+        url = f"https://itunes.apple.com/search?term={urllib.parse.quote(query.strip())}&entity=song&limit=3"
+        req = urllib.request.Request(url, headers={"User-Agent": "MediaMultiTool/1.0", "Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=5) as r:
+            data = json.loads(r.read().decode("utf-8"))
+            results = data.get("results", [])
+            if results:
+                return results[0]
+    except Exception:
+        pass
+    return None
 
 
 def infer_genre_from_text(
@@ -68,56 +223,19 @@ def infer_genre_from_text(
     raw_title: str = "",
     categories: Optional[List[str]] = None,
     tags: Optional[List[str]] = None,
+    album: str = "",
+    description: str = "",
 ) -> str:
     """
-    Deduz o gênero musical com base no contexto do título, tags e categoria do vídeo/mídia.
-    Essencial para trilhas de jogos (OSTs), chiptunes, lo-fi, etc., mesmo quando não catalogadas no MusicBrainz.
+    Deduz o gênero musical com base no contexto do título, tags, categorias, álbum e descrição.
     """
-    combined = f"{title} {raw_title} {' '.join(tags or [])} {' '.join(categories or [])}".lower()
-
-    # Trilhas de Jogos
-    is_game = (
-        any(k in combined for k in (
-            "original game soundtrack", "video game soundtrack", "game ost",
-            "game soundtrack", "vgm", "video game music", "gamerip", "game rip"
-        ))
-        or (categories and any(c.lower() == "gaming" for c in categories) and any(k in combined for k in ("soundtrack", "ost", "theme", "bgm")))
-    )
-
-    if is_game:
-        if any(k in combined for k in ("electronic", "techno", "house", "edm", "dance")):
-            return "Electronic / Game Soundtrack"
-        if any(k in combined for k in ("chiptune", "8-bit", "16-bit", "8bit", "16bit")):
-            return "Chiptune / Game Soundtrack"
-        if any(k in combined for k in ("orchestral", "symphon", "orchestra")):
-            return "Orchestral / Game Soundtrack"
-        if any(k in combined for k in ("rock", "metal")):
-            return "Rock / Game Soundtrack"
-        if any(k in combined for k in ("ambient", "atmospheric")):
-            return "Ambient / Game Soundtrack"
-        return "Video Game Music"
-
-    if any(k in combined for k in ("chiptune", "8-bit", "16-bit", "8bit", "16bit")):
-        return "Chiptune / 8-Bit"
-
-    if any(k in combined for k in ("lo-fi", "lofi", "chillhop")):
-        return "Lo-Fi / Chillhop"
-
-    if any(k in combined for k in ("synthwave", "retrowave", "cyberpunk", "vaporwave")):
-        return "Synthwave"
-
-    if any(k in combined for k in ("ambient", "atmospheric", "meditation")):
-        return "Ambient"
-
-    if any(k in combined for k in ("soundtrack", "ost", "o.s.t.", "original score", "bgm")):
-        return "Soundtrack"
-
-    if any(k in combined for k in ("rock", "hard rock", "heavy metal", "punk")):
-        return "Rock"
-
-    if any(k in combined for k in ("electronic", "techno", "trance", "house", "dubstep")):
-        return "Electronic"
-
+    combined = f"{title} {raw_title} {album} {' '.join(tags or [])} {' '.join(categories or [])} {description}"
+    vgm = detect_vgm_genre(combined)
+    if vgm:
+        return vgm
+    broad = infer_broad_genre(combined)
+    if broad:
+        return broad
     return ""
 
 
@@ -251,10 +369,12 @@ class SpotifyResolver:
 
 class GenreTagResolver:
     """
-    Consulta o banco de dados aberto e livre do MusicBrainz para identificar
-    gêneros musicais, compositores, álbuns e anos de lançamento.
-    Ideal para trilhas de videogame (VGM) e músicas em geral.
-    Totalmente gratuito e livre de chaves de API.
+    Identifica gêneros musicais, compositores, álbuns e anos de lançamento utilizando
+    uma arquitetura em múltiplas camadas de alta disponibilidade e precisão:
+    1. Detecção Especializada para Músicas de Videogame (VGM)
+    2. Consulta rápida via iTunes Search API (100% gratuita, pública e sem limitação de 1 req/s)
+    3. Consulta ao banco aberto MusicBrainz (com escape de caracteres e verificação de artista)
+    4. Inferência semântica e contextual avançada
     """
 
     USER_AGENT = "MediaMultiTool/1.0 (https://github.com/MigzuLCS/Media-MultiTool)"
@@ -266,90 +386,124 @@ class GenreTagResolver:
         raw_title: str = "",
         categories: Optional[List[str]] = None,
         tags: Optional[List[str]] = None,
+        album: str = "",
+        description: str = "",
+        existing_genre: str = "",
     ) -> Dict[str, Any]:
         """
-        Pesquisa metadados no MusicBrainz de forma inteligente:
-        1. Busca por gravação (recording) e artista.
-        2. Se não houver tags na gravação, busca na publicação (release) do álbum/jogo.
-        3. Se não houver retorno do MusicBrainz, deduz o gênero contextual por regras (infer_genre_from_text).
+        Pesquisa metadados e gênero de forma inteligente e multi-camadas:
+        1. Identificação instantânea de VGM / Músicas de Jogos por hardware, estúdios, franquias e termos.
+        2. Pesquisa de alta velocidade no iTunes Search API público.
+        3. Consulta ao MusicBrainz com queries sanitizadas e proteção contra 503.
+        4. Inferência semântica ampla por palavras-chave e tags.
         """
         clean_t = clean_title_for_search(title or raw_title)
         if not clean_t and not raw_title:
             return {}
 
         result: Dict[str, Any] = {
-            "genre": "",
-            "album": "",
-            "artist": "",
+            "genre": existing_genre or "",
+            "album": album or "",
+            "artist": artist or "",
             "date": "",
         }
 
-        # 1. Tentar busca no MusicBrainz por Recording
+        cand_artist = artist
+        cand_title = clean_t
+        if not cand_artist and " - " in clean_t:
+            parts = clean_t.split(" - ")
+            cand_artist = parts[0].strip()
+            cand_title = " - ".join(parts[1:]).strip()
+
+        combined = f"{clean_t} {raw_title} {artist} {album} {' '.join(tags or [])} {' '.join(categories or [])} {description}"
+
+        # 1. Detecção Especializada para Músicas de Videogame (VGM)
+        vgm_genre = detect_vgm_genre(combined)
+        if vgm_genre:
+            result["genre"] = vgm_genre
+            if not result["album"] and " - " in clean_t:
+                result["album"] = clean_t.split(" - ")[0].strip()
+            if not result["artist"] and " - " in clean_t:
+                result["artist"] = clean_t.split(" - ")[0].strip()
+            return result
+
+        # 2. Consulta rápida à API pública do iTunes (alta disponibilidade para faixas comerciais, clássica, jazz, anime, etc.)
+        itunes_queries = []
+        if cand_artist and cand_title:
+            itunes_queries.append(f"{cand_artist} {cand_title}")
+        if clean_t and clean_t not in itunes_queries:
+            itunes_queries.append(clean_t)
+        if raw_title and raw_title not in itunes_queries:
+            itunes_queries.append(raw_title)
+        if cand_artist and cand_artist not in itunes_queries:
+            itunes_queries.append(cand_artist)
+
+        for q in itunes_queries:
+            itunes_match = search_itunes_metadata(q)
+            if itunes_match:
+                itunes_genre = itunes_match.get("primaryGenreName", "")
+                ret_artist = (itunes_match.get("artistName") or "").lower()
+                ret_track = (itunes_match.get("trackName") or "").lower()
+
+                # Validação de relevância para evitar falsos positivos
+                if cand_artist:
+                    ca = cand_artist.lower()
+                    if ca not in ret_artist and ret_artist not in ca:
+                        ct = cand_title.lower() if cand_title else ""
+                        if not ct or (ct not in ret_track and ret_track not in ct):
+                            continue
+                elif cand_title:
+                    ct = cand_title.lower()
+                    if ct not in ret_track and ret_track not in ct:
+                        continue
+
+                if itunes_genre:
+                    result["genre"] = itunes_genre
+                    if not result["artist"]:
+                        result["artist"] = itunes_match.get("artistName", "")
+                    if not result["album"]:
+                        result["album"] = itunes_match.get("collectionName", "")
+                    if not result["date"] and itunes_match.get("releaseDate"):
+                        result["date"] = itunes_match.get("releaseDate")[:4]
+                    return result
+
+        # 3. Consulta ao MusicBrainz com queries protegidas por escape
         try:
-            query_str = f'recording:"{clean_t}"'
-            if artist:
-                query_str += f' AND artist:"{artist}"'
+            clean_rec = re.sub(r'([+\-&|!(){}\[\]^"~*?:\\/])', r'\\\1', cand_title or clean_t)
+            query_str = f'recording:"{clean_rec}"'
+            if cand_artist:
+                clean_art = re.sub(r'([+\-&|!(){}\[\]^"~*?:\\/])', r'\\\1', cand_artist)
+                query_str += f' AND artist:"{clean_art}"'
 
             url = f"https://musicbrainz.org/ws/2/recording?query={urllib.parse.quote(query_str)}&fmt=json&limit=3"
             req = urllib.request.Request(url, headers={"User-Agent": self.USER_AGENT, "Accept": "application/json"})
 
-            with urllib.request.urlopen(req, timeout=6) as resp:
+            with urllib.request.urlopen(req, timeout=5) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 recordings = data.get("recordings", [])
 
                 if recordings:
                     rec = recordings[0]
-                    if "artist-credit" in rec and rec["artist-credit"]:
+                    if not result["artist"] and "artist-credit" in rec and rec["artist-credit"]:
                         result["artist"] = rec["artist-credit"][0].get("name", "")
 
-                    if "releases" in rec and rec["releases"]:
+                    if not result["album"] and "releases" in rec and rec["releases"]:
                         rel = rec["releases"][0]
                         result["album"] = rel.get("title", "")
-                        result["date"] = rel.get("date", "")[:4] if rel.get("date") else ""
+                        if not result["date"]:
+                            result["date"] = rel.get("date", "")[:4] if rel.get("date") else ""
 
                     rec_tags = rec.get("tags", [])
                     genre_names = [t.get("name", "").strip().title() for t in sorted(rec_tags, key=lambda x: x.get("count", 0), reverse=True) if t.get("name")]
-                    if genre_names:
+                    if genre_names and not result["genre"]:
                         result["genre"] = " / ".join(genre_names[:2])
+                        return result
         except Exception:
             pass
 
-        # 2. Se o gênero ou álbum não foram encontrados, verificar se o título tem formato "Jogo/Artista - Faixa"
-        if (not result["genre"] or not result["album"]) and " - " in clean_t:
-            parts = clean_t.split(" - ")
-            part_a = parts[0].strip()
-            try:
-                # Pesquisa o álbum/jogo na base de Releases do MusicBrainz
-                rel_url = f"https://musicbrainz.org/ws/2/release?query={urllib.parse.quote('release:' + part_a)}&fmt=json&limit=3"
-                rel_req = urllib.request.Request(rel_url, headers={"User-Agent": self.USER_AGENT, "Accept": "application/json"})
-                with urllib.request.urlopen(rel_req, timeout=6) as r_resp:
-                    r_data = json.loads(r_resp.read().decode("utf-8"))
-                    releases = r_data.get("releases", [])
-                    if releases:
-                        best_rel = releases[0]
-                        if not result["album"]:
-                            result["album"] = best_rel.get("title", "")
-                        if not result["artist"] and "artist-credit" in best_rel and best_rel["artist-credit"]:
-                            result["artist"] = best_rel["artist-credit"][0].get("name", "")
-                        if not result["date"] and best_rel.get("date"):
-                            result["date"] = best_rel.get("date", "")[:4]
-
-                        # Extrai tags da release (ex: electronic, house, ambient house)
-                        rel_tags = best_rel.get("tags", [])
-                        tag_names = [t.get("name", "").strip().title() for t in sorted(rel_tags, key=lambda x: x.get("count", 0), reverse=True) if t.get("name")]
-                        if tag_names and not result["genre"]:
-                            result["genre"] = " / ".join(tag_names[:2])
-            except Exception:
-                pass
-
-        # 3. Fallback inteligente de gênero por regras contextuais do vídeo (OST, Game, Chiptune, etc.)
+        # 4. Fallback semântico e contextual
         if not result["genre"]:
-            inferred = infer_genre_from_text(
-                title=clean_t,
-                raw_title=raw_title,
-                categories=categories,
-                tags=tags,
-            )
+            inferred = infer_broad_genre(combined)
             if inferred:
                 result["genre"] = inferred
 

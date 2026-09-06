@@ -14,10 +14,30 @@ from core.metadata_enricher import (
     audio_tagger,
     clean_title_for_search,
 )
+def get_safe_unique_path(target_path: Path) -> Path:
+    """
+    Gera um caminho seguro com sufixo incremental quando o arquivo já existe no disco.
+    Exemplo: se 'musica.mp3' já existir, gera 'musica (1).mp3', 'musica (2).mp3', etc.
+    Isso impede completamente a perda ou substituição acidental de arquivos do usuário.
+    """
+    if not target_path.exists():
+        return target_path
+
+    stem = target_path.stem
+    suffix = target_path.suffix
+    parent = target_path.parent
+
+    counter = 1
+    while True:
+        candidate = parent / f"{stem} ({counter}){suffix}"
+        if not candidate.exists():
+            return candidate
+        counter += 1
 
 
 class YouTubeDownloader:
-    """Interface moderna e segura para download de mídias via yt-dlp e Spotify."""
+    """Interface para obtenção e processamento de mídias online públicas ou autorizadas via yt-dlp e metadados abertos."""
+
 
     def __init__(self):
         pass
@@ -127,6 +147,50 @@ class YouTubeDownloader:
         u = url.lower().strip()
         return "list=rd" in u or "start_radio=1" in u
 
+    @staticmethod
+    def get_safe_unique_path(target_path: Path) -> Path:
+        return get_safe_unique_path(target_path)
+
+    def predict_output_path(
+        self,
+        url: str,
+        output_dir: str,
+        mode: str = "video",
+        known_title: Optional[str] = None,
+    ) -> Optional[Path]:
+        """
+        Prevê o caminho final do arquivo no disco após as regras de limpeza de ruídos e formato.
+        Retorna o Path previsto ou None caso não seja possível determinar.
+        """
+        ext = "mp3" if mode == "audio" else "mp4"
+        platform = self.detect_platform(url)
+
+        title = known_title or ""
+        if not title:
+            if platform == "spotify":
+                try:
+                    sp_meta = spotify_resolver.resolve(url)
+                    title = f"{sp_meta['artist']} - {sp_meta['title']}"
+                except Exception:
+                    pass
+            elif platform == "youtube":
+                try:
+                    info = self.get_info(url)
+                    title = info.get("title", "")
+                except Exception:
+                    pass
+
+        if not title:
+            return None
+
+        clean_stem = clean_title_for_search(title)
+        if not clean_stem:
+            clean_stem = title
+        safe_stem = "".join(c for c in clean_stem if c not in '<>:"/\\|?*').strip()
+        if not safe_stem:
+            safe_stem = "media"
+
+        return Path(output_dir) / f"{safe_stem}.{ext}"
 
     def get_info(self, url: str) -> Dict[str, Any]:
         """Obtém metadados do vídeo/áudio sem realizar download."""
@@ -218,6 +282,8 @@ class YouTubeDownloader:
         quality: str = "best",
         auto_tag: bool = True,
         is_playlist: bool = False,
+        playlist_limit: int = 20,
+        collision_strategy: str = "auto",
         on_progress: Optional[Callable[[float, str], None]] = None,
         cancel_event: Optional[threading.Event] = None,
     ) -> str:
@@ -229,7 +295,9 @@ class YouTubeDownloader:
             mode: 'video' ou 'audio'.
             quality: 'best', '1080p', '720p', etc.
             auto_tag: Se True, identifica e injeta metadados (gênero, artista, capa) via FFmpeg.
-            is_playlist: Se True, baixa todas as faixas da playlist (com limite de 20 para Mix RD).
+            is_playlist: Se True, baixa faixas da playlist/mix.
+            playlist_limit: Limite máximo de faixas a baixar (ex: 1 a 30).
+            collision_strategy: 'auto', 'overwrite', 'copy' ou 'skip'.
             on_progress: Callback para barra de progresso (frac, mensagem).
             cancel_event: Evento para cancelamento.
         Returns:
@@ -276,8 +344,6 @@ class YouTubeDownloader:
             safe_title = f"{spotify_info['artist']} - {spotify_info['title']}"
             safe_title = "".join(c for c in safe_title if c not in '<>:"/\\|?*')
             out_template = str(Path(output_dir) / f"{safe_title}.%(ext)s")
-        elif is_playlist:
-            out_template = str(Path(output_dir) / "%(playlist_index&{:02d} - |)s%(title)s.%(ext)s")
         else:
             out_template = str(Path(output_dir) / "%(title)s.%(ext)s")
 
@@ -300,7 +366,10 @@ class YouTubeDownloader:
                 if on_progress:
                     if is_playlist:
                         item_idx = d.get("playlist_index") or 1
-                        item_total = d.get("n_entries") or (20 if is_mix else 0)
+                        limit_val = playlist_limit if (playlist_limit and playlist_limit > 0) else (20 if is_mix else 0)
+                        item_total = d.get("n_entries") or limit_val
+                        if limit_val > 0 and item_total > limit_val:
+                            item_total = limit_val
                         overall_frac = ((item_idx - 1) + frac) / (item_total if item_total > 0 else 20)
                         tot_str = str(item_total) if item_total > 0 else "?"
                         on_progress(
@@ -325,9 +394,11 @@ class YouTubeDownloader:
             "noplaylist": not is_playlist,
         }
 
-        if is_playlist and is_mix:
-            # Limita a 20 músicas no caso de Mix RD contínuo
-            ydl_opts["playlistend"] = 20
+        if is_playlist:
+            if playlist_limit and playlist_limit > 0:
+                ydl_opts["playlistend"] = playlist_limit
+            elif is_mix:
+                ydl_opts["playlistend"] = 20
 
         if ffmpeg_bin:
             ydl_opts["ffmpeg_location"] = str(Path(ffmpeg_bin).parent)
@@ -357,6 +428,17 @@ class YouTubeDownloader:
                 "merge_output_format": "mp4",
             })
 
+        if not is_playlist and collision_strategy == "skip":
+            try:
+                known_t = f"{spotify_info['artist']} - {spotify_info['title']}" if spotify_info else None
+                predicted_p = self.predict_output_path(url, output_dir, mode=mode, known_title=known_t)
+                if predicted_p and predicted_p.exists() and predicted_p.stat().st_size > 10240:
+                    if on_progress:
+                        on_progress(1.0, f"Download pulado: o arquivo '{predicted_p.name}' já existe na pasta.")
+                    return str(predicted_p)
+            except Exception:
+                pass
+
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             if cancel_event and cancel_event.is_set():
                 raise Exception("Download cancelado pelo usuário.")
@@ -368,6 +450,7 @@ class YouTubeDownloader:
             entries = info.get("entries", []) if info else []
             entries = [e for e in entries if e]
             saved_count = 0
+            skipped_count = 0
 
             for e in entries:
                 if cancel_event and cancel_event.is_set():
@@ -381,15 +464,27 @@ class YouTubeDownloader:
                     if p.exists():
                         # Renomeia para remover ruídos do nome
                         clean_stem = clean_title_for_search(p.stem)
-                        if clean_stem:
-                            safe_stem = "".join(c for c in clean_stem if c not in '<>:"/\\|?*')
-                            new_p = p.with_name(f"{safe_stem}{p.suffix}")
-                            if new_p != p:
-                                if new_p.exists():
-                                    new_p.unlink()
-                                p.rename(new_p)
-                                p = new_p
-                                f = str(p)
+                        if not clean_stem:
+                            clean_stem = p.stem
+                        safe_stem = "".join(c for c in clean_stem if c not in '<>:"/\\|?*').strip()
+                        new_p = p.with_name(f"{safe_stem}{p.suffix}")
+                        if new_p != p:
+                            if new_p.exists():
+                                existing_size = new_p.stat().st_size
+                                cur_size = p.stat().st_size
+                                # Se o arquivo existente for válido e de tamanho similar, pula a duplicata
+                                if existing_size > 10240 and abs(existing_size - cur_size) < max(50000, 0.25 * cur_size):
+                                    try:
+                                        p.unlink()
+                                    except Exception:
+                                        pass
+                                    skipped_count += 1
+                                    continue
+                                else:
+                                    new_p = get_safe_unique_path(new_p)
+                            p.rename(new_p)
+                            p = new_p
+                            f = str(p)
 
                         # Auto-tagging
                         if mode == "audio" and auto_tag:
@@ -401,14 +496,17 @@ class YouTubeDownloader:
                                 raw_title=raw_t,
                                 categories=e.get("categories") or [],
                                 tags=e.get("tags") or [],
+                                album=e.get("album") or "",
+                                description=e.get("description") or "",
+                                existing_genre=e.get("genre") or "",
                             )
                             audio_tagger.tag_mp3(
                                 mp3_path=f,
-                                title=clean_t or raw_t,
+                                title=e.get("track") or clean_t or raw_t,
                                 artist=mb_info.get("artist") or e.get("artist") or (clean_t.split(" - ")[0].strip() if " - " in clean_t else (e.get("uploader") or "")),
                                 album=mb_info.get("album") or e.get("album") or (clean_t.split(" - ")[0].strip() if " - " in clean_t else ""),
-                                genre=mb_info.get("genre") or "",
-                                date=mb_info.get("date") or "",
+                                genre=mb_info.get("genre") or e.get("genre") or "",
+                                date=mb_info.get("date") or (str(e.get("release_year")) if e.get("release_year") else ""),
                                 cover_url=e.get("thumbnail") or "",
                             )
                         saved_count += 1
@@ -416,7 +514,10 @@ class YouTubeDownloader:
                     pass
 
             if on_progress:
-                on_progress(1.0, f"Download da playlist concluído! {saved_count} faixas salvas com sucesso.")
+                if skipped_count > 0:
+                    on_progress(1.0, f"Download da playlist concluído! {saved_count} faixas salvas ({skipped_count} já existiam na pasta e foram puladas).")
+                else:
+                    on_progress(1.0, f"Download da playlist concluído! {saved_count} faixas salvas com sucesso.")
             return output_dir
 
         # 4. Pós-processamento para Mídia Individual
@@ -429,19 +530,24 @@ class YouTubeDownloader:
             filename = str(Path(filename).with_suffix(".mp3"))
 
         # Renomeia o arquivo físico para remover ruídos do nome (ex: " - Original Game Soundtrack")
-        if Path(filename).exists():
-            clean_stem = clean_title_for_search(Path(filename).stem)
-            if clean_stem:
-                safe_stem = "".join(c for c in clean_stem if c not in '<>:"/\\|?*')
-                clean_path = Path(filename).with_name(f"{safe_stem}{Path(filename).suffix}")
-                if clean_path != Path(filename):
-                    try:
-                        if clean_path.exists():
+        p_indiv = Path(filename)
+        if p_indiv.exists():
+            clean_stem = clean_title_for_search(p_indiv.stem)
+            if not clean_stem:
+                clean_stem = p_indiv.stem
+            safe_stem = "".join(c for c in clean_stem if c not in '<>:"/\\|?*').strip()
+            clean_path = p_indiv.with_name(f"{safe_stem}{p_indiv.suffix}")
+            if clean_path != p_indiv:
+                try:
+                    if clean_path.exists():
+                        if collision_strategy == "overwrite":
                             clean_path.unlink()
-                        Path(filename).rename(clean_path)
-                        filename = str(clean_path)
-                    except Exception:
-                        pass
+                        else:
+                            clean_path = get_safe_unique_path(clean_path)
+                    p_indiv.rename(clean_path)
+                    filename = str(clean_path)
+                except Exception:
+                    pass
 
         # Enriquecimento de Metadados e Gênero via FFmpeg
         if mode == "audio" and auto_tag and Path(filename).exists():
@@ -486,9 +592,12 @@ class YouTubeDownloader:
                     raw_title=raw_title,
                     categories=info.get("categories") or [],
                     tags=info.get("tags") or [],
+                    album=info.get("album") or "",
+                    description=info.get("description") or "",
+                    existing_genre=info.get("genre") or "",
                 )
 
-                tag_title = clean_t or raw_title
+                tag_title = info.get("track") or clean_t or raw_title
                 tag_artist = mb_info.get("artist") or official_artist or (clean_t.split(" - ")[0].strip() if " - " in clean_t else uploader)
                 tag_album = mb_info.get("album") or info.get("album") or (clean_t.split(" - ")[0].strip() if " - " in clean_t else "")
                 tag_genre = mb_info.get("genre") or info.get("genre") or ""

@@ -142,5 +142,41 @@ class TestMetadataEnricher(unittest.TestCase):
             self.assertIn("title=Sweden", cmd)
 
 
+    def test_vgm_genre_detection(self):
+        from core.metadata_enricher import detect_vgm_genre
+        self.assertEqual(detect_vgm_genre("Donkey Kong Country 3 - Cascade Capers GBA + SNES"), "Video Game Music")
+        self.assertEqual(detect_vgm_genre("Napple Tale Arsia in Daydream - Rain Waltz (Dreamcast)"), "Orchestral / Game Soundtrack")
+        self.assertEqual(detect_vgm_genre("Rasetsu Alternative - BGM #11 SHOT SKY (DnB)"), "Drum & Bass / Game Music")
+        self.assertEqual(detect_vgm_genre("Sega Marine Fishing - The Offing"), "Video Game Music")
+        self.assertEqual(detect_vgm_genre("Net de Tennis - Tennis samba PS1"), "Jazz / Game Soundtrack")
+        self.assertEqual(detect_vgm_genre("ChainDive - Track 24 (Movin' On) PS2"), "Video Game Music")
+        self.assertEqual(detect_vgm_genre("The Conveni Portable - BGM 4 PSP"), "Video Game Music")
+
+    def test_broad_genre_inference(self):
+        from core.metadata_enricher import infer_broad_genre
+        self.assertEqual(infer_broad_genre("Shiro SAGISU - Hedgehog's Dilemma Neon Genesis Evangelion Anime"), "Anime / Soundtrack")
+        self.assertEqual(infer_broad_genre("Remo Anzovino - Piano Solo Neoclassical"), "Classical")
+        self.assertEqual(infer_broad_genre("Walter Wanderley Bossa Nova Samba"), "Bossa Nova")
+        self.assertEqual(infer_broad_genre("Miles Davis Latin Jazz Bebop"), "Jazz")
+        self.assertEqual(infer_broad_genre("Miki Matsubara Stay With Me City Pop"), "City Pop")
+        self.assertEqual(infer_broad_genre("Iron Maiden Heavy Metal"), "Metal")
+
+    @patch("core.metadata_enricher.search_itunes_metadata")
+    def test_query_musicbrainz_with_itunes_integration(self, mock_search_itunes):
+        mock_search_itunes.return_value = {
+            "primaryGenreName": "Classical Crossover",
+            "artistName": "Remo Anzovino",
+            "collectionName": "Dispari (Remastered 2022)",
+            "releaseDate": "2022-05-20",
+        }
+
+        resolver = GenreTagResolver()
+        res = resolver.query_musicbrainz("Cammino nella notte", artist="Remo Anzovino")
+        self.assertEqual(res["genre"], "Classical Crossover")
+        self.assertEqual(res["artist"], "Remo Anzovino")
+        self.assertEqual(res["album"], "Dispari (Remastered 2022)")
+        self.assertEqual(res["date"], "2022")
+
+
 if __name__ == "__main__":
     unittest.main()

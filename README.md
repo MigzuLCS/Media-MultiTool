@@ -1,8 +1,8 @@
 # 🎬 Media MultiTool
 
-> Aplicativo desktop moderno, modular e extensível para manipulação de mídias (download de vídeos/áudios do YouTube, compressão para Discord/WhatsApp, corte ultra-rápido sem perda e conversão de formatos).
+> Aplicativo desktop moderno, modular e extensível para manipulação de mídias locais e online (compressão de vídeos para Discord/WhatsApp, corte ultra-rápido sem perda, conversão de formatos e download de mídias públicas ou autorizadas).
 
-Desenvolvido em **Python** com **CustomTkinter**, integrado nativamente ao **yt-dlp** e ao **FFmpeg**.
+Desenvolvido em **Python** com **CustomTkinter**, integrado nativamente ao **FFmpeg** e a utilitários de mídia de código aberto como o **yt-dlp**.
 
 ---
 
@@ -10,10 +10,10 @@ Desenvolvido em **Python** com **CustomTkinter**, integrado nativamente ao **yt-
 
 | Módulo | Descrição | Destaques Técnicos |
 | :--- | :--- | :--- |
-| **📥 Downloader Universal** | Baixe vídeos ou extraia áudios com tags e capas de YouTube, Spotify, TikTok, Instagram, Twitter/X e mais. | Suporte a links do Spotify (sem API), auto-tagging de gênero musical via MusicBrainz + FFmpeg, seleção de qualidade até 1080p+, MP3 a 192kbps com capa embutida. |
 | **📉 Compressor de Vídeo** | Reduza o tamanho de vídeos pesados para caber nos limites de upload. | Presets prontos para **Discord (25 MB)**, **WhatsApp (16 MB)**, **Email (10 MB)**, **Nitro (50 MB)** ou tamanho customizado. Codecs H.264 ou H.265. |
 | **✂️ Corte Rápido** | Isole trechos específicos definindo tempo inicial e final. | **Modo Lossless Instantâneo (`-c copy`)**: processa em menos de 1 segundo e mantém 100% da qualidade original sem reencodar. |
 | **🔄 Conversor de Formatos** | Transforme vídeos em GIFs de alta fidelidade ou extraia faixas sonoras. | **MP4 $\to$ GIF** com filtro de paleta em 2 passos (`palettegen`/`paletteuse`) sem bordas granuladas; **Vídeo $\to$ MP3** (128 a 320 kbps); **Vídeo $\to$ WAV**; remuxing de containers. |
+| **📥 Download de Mídia** | Obtenha cópias locais de vídeos ou extraia áudios de conteúdos online públicos, autorizados ou sob licenças abertas. | Suporte amplo a protocolos web via yt-dlp, auto-tagging de metadados abertos via MusicBrainz + FFmpeg, seleção de resolução e exportação direta para áudio. |
 | **⚙️ Configurações & FFmpeg** | Painel de controle do motor de mídia e preferências visuais. | **Instalação automática do FFmpeg em 1 clique**, seletor de tema (Dark / Light) e escolha da pasta padrão de downloads. |
 
 ---
@@ -149,7 +149,7 @@ mediamultitool/
 │   └── tasks.py                # Gerenciador de threads assíncronas (UI nunca congela)
 ├── features/                   # Módulos e abas independentes (Plugins)
 │   ├── base.py                 # Contrato BaseFeature
-│   ├── youtube_tab.py          # Aba YouTube Downloader
+│   ├── youtube_tab.py          # Aba Download de Mídia Online
 │   ├── compress_tab.py         # Aba Compressor de Vídeos
 │   ├── trim_tab.py             # Aba Corte Rápido
 │   ├── convert_tab.py          # Aba Conversor de Mídia (GIF / MP3)
@@ -173,3 +173,13 @@ O FFmpeg é necessário para as funções de corte, compressão e conversão:
 2. Em seguida, busca no `PATH` do sistema Windows.
 3. Se não encontrar, a barra lateral exibirá um alerta amigável `⚠️ FFmpeg Ausente`.
 4. Basta acessar a aba **Configurações** e clicar em **"Baixar FFmpeg Automaticamente (Oficial)"** para que o app baixe e extraia os executáveis oficiais em poucos segundos sem você precisar configurar variáveis de ambiente!
+
+---
+
+## ⚖️ Aviso Legal e Isenção de Responsabilidade (Disclaimer)
+
+1. **Finalidade Educacional e Uso Pessoal**: O **Media MultiTool** é desenvolvido e disponibilizado como software livre de código aberto exclusivamente para fins educacionais, de pesquisa em manipulação de codecs/mídias e para auxílio na realização de cópias de segurança de conteúdos próprios ou de domínio público.
+2. **Propriedade Intelectual e Direitos Autorais**: Este projeto respeita integralmente as legislações de direitos autorais (incluindo a Lei Federal Brasileira nº 9.610/98 e leis internacionais). O software não tem por finalidade burlar mecanismos de proteção digital (DRM) ou incentivar a pirataria.
+3. **Ausência de Servidores Centrais / Armazenamento**: O software não armazena, hospeda, indexa nem retransmite fluxos ou arquivos de mídia. Todas as operações de download, corte, compressão e conversão são executadas estritamente de forma descentralizada e local no computador do próprio usuário.
+4. **Isenção de Vínculo e Marcas**: O Media MultiTool não possui qualquer tipo de filiação, endosso, patrocínio ou conexão formal com Google LLC, YouTube, Spotify AB, Meta Platforms Inc. ou quaisquer outras empresas cujos protocolos públicos sejam compatíveis com utilitários de terceiros (como o `yt-dlp`). Todas as marcas citadas pertencem aos seus respectivos proprietários.
+5. **Responsabilidade do Usuário**: É responsabilidade exclusiva do usuário final assegurar que a utilização desta ferramenta esteja em estrita conformidade com as leis do seu país e com os Termos de Serviço de cada plataforma acessada.

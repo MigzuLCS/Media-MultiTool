@@ -1,7 +1,9 @@
 import unittest
+import tempfile
 from pathlib import Path
 import sys
 from unittest.mock import patch, MagicMock
+
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
@@ -101,6 +103,8 @@ class TestYouTubeDownloader(unittest.TestCase):
         self.dl.download('https://www.youtube.com/playlist?list=PL12345', output_dir='C:/tmp', is_playlist=True)
         ydl_opts = mock_ydl_cls.call_args[0][0]
         self.assertFalse(ydl_opts.get('noplaylist'))
+        # Garante que o template nao adiciona prefixo de indice da playlist
+        self.assertNotIn('playlist_index', ydl_opts.get('outtmpl', ''))
 
     @patch('yt_dlp.YoutubeDL')
     def test_download_mix_playlist_limits_to_20(self, mock_ydl_cls):
@@ -112,6 +116,18 @@ class TestYouTubeDownloader(unittest.TestCase):
         ydl_opts = mock_ydl_cls.call_args[0][0]
         self.assertFalse(ydl_opts.get('noplaylist'))
         self.assertEqual(ydl_opts.get('playlistend'), 20)
+
+    @patch('yt_dlp.YoutubeDL')
+    def test_download_playlist_with_slider_limit(self, mock_ydl_cls):
+        mock_ydl_instance = MagicMock()
+        mock_ydl_cls.return_value.__enter__.return_value = mock_ydl_instance
+        mock_ydl_instance.extract_info.return_value = {'entries': []}
+
+        # Simula o limite selecionado na barra deslizante (ex: 30)
+        self.dl.download('https://www.youtube.com/playlist?list=PL123', output_dir='C:/tmp', is_playlist=True, playlist_limit=30)
+        ydl_opts = mock_ydl_cls.call_args[0][0]
+        self.assertFalse(ydl_opts.get('noplaylist'))
+        self.assertEqual(ydl_opts.get('playlistend'), 30)
 
     def test_playlist_detection_helpers(self):
         self.assertTrue(self.dl.has_playlist("https://www.youtube.com/watch?v=123&list=PL123"))
@@ -166,7 +182,61 @@ class TestYouTubeDownloader(unittest.TestCase):
             download=True
         )
 
+    def test_get_safe_unique_path_no_collision(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            target = Path(tmpdir) / "song.mp3"
+            safe = self.dl.get_safe_unique_path(target)
+            self.assertEqual(safe, target)
+
+    def test_get_safe_unique_path_with_collision(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            target = Path(tmpdir) / "song.mp3"
+            target.write_text("dummy", encoding="utf-8")
+            safe = self.dl.get_safe_unique_path(target)
+            expected = Path(tmpdir) / "song (1).mp3"
+            self.assertEqual(safe, expected)
+
+    def test_get_safe_unique_path_with_multiple_collisions(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            target = Path(tmpdir) / "song.mp3"
+            target.write_text("dummy", encoding="utf-8")
+            (Path(tmpdir) / "song (1).mp3").write_text("dummy", encoding="utf-8")
+            safe = self.dl.get_safe_unique_path(target)
+            expected = Path(tmpdir) / "song (2).mp3"
+            self.assertEqual(safe, expected)
+
+
+    def test_predict_output_path(self):
+        with patch.object(self.dl, "get_info", return_value={"title": "Super Mario 64 - Dire Docks (OST)"}):
+            predicted = self.dl.predict_output_path(
+                "https://www.youtube.com/watch?v=123",
+                output_dir="C:/downloads",
+                mode="audio"
+            )
+            self.assertIsNotNone(predicted)
+            self.assertEqual(str(predicted).replace("\\", "/"), "C:/downloads/Super Mario 64 - Dire Docks.mp3")
+
+    @patch('yt_dlp.YoutubeDL')
+    def test_download_skip_if_file_exists(self, mock_ydl_cls):
+        with patch.object(self.dl, "predict_output_path") as mock_predict:
+            mock_path = MagicMock()
+            mock_path.exists.return_value = True
+            mock_path.stat.return_value.st_size = 500000
+            mock_path.name = "Dire Docks.mp3"
+            mock_path.__str__.return_value = "C:/downloads/Dire Docks.mp3"
+            mock_predict.return_value = mock_path
+
+            res = self.dl.download(
+                "https://www.youtube.com/watch?v=123",
+                output_dir="C:/downloads",
+                mode="audio",
+                collision_strategy="skip"
+            )
+            self.assertEqual(res, "C:/downloads/Dire Docks.mp3")
+            mock_ydl_cls.assert_not_called()
+
 
 if __name__ == '__main__':
     unittest.main()
+
 

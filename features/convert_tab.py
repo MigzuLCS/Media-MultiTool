@@ -15,6 +15,9 @@ class ConvertTab(BaseFeature):
     title = "Conversor de Mídia"
     icon = "🔄"
     description = "Converta MP4 para GIF de alta qualidade, extraia áudio MP3/WAV ou alterne formatos."
+    category = "Conversão"
+    requires_ffmpeg = True
+    estimated_size_mb = 5.0
 
     def render(self, parent: ctk.CTkFrame) -> ctk.CTkFrame:
         self.frame = ctk.CTkScrollableFrame(parent, fg_color="transparent")

@@ -9,13 +9,17 @@ from core.ffmpeg_manager import ffmpeg_manager
 from core.installer import ffmpeg_installer
 from core.tasks import task_manager
 from core.config import config
+from core.module_manager import module_manager
 
 
 class SettingsTab(BaseFeature):
     id = "settings"
     title = "Configurações"
-    icon = "⚙️"
+    icon = "⚙"
     description = "Gerencie o motor FFmpeg, temas e pastas padrão."
+    category = "Sistema"
+    is_core = True
+    estimated_size_mb = 1.0
 
     def render(self, parent: ctk.CTkFrame) -> ctk.CTkFrame:
         self.frame = ctk.CTkScrollableFrame(parent, fg_color="transparent")
@@ -133,6 +137,90 @@ class SettingsTab(BaseFeature):
             command=self._change_default_dir,
         ).pack(side="right")
 
+        # Seção Gerenciador de Ferramentas & Módulos
+        mod_card = ctk.CTkFrame(self.frame)
+        mod_card.pack(fill="x", pady=(0, 16), padx=2)
+
+        ctk.CTkLabel(
+            mod_card,
+            text="🧩 Ferramentas & Módulos Instalados:",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            anchor="w",
+        ).pack(fill="x", padx=14, pady=(12, 2))
+
+        ctk.CTkLabel(
+            mod_card,
+            text="Ative ou desative ferramentas conforme seu fluxo de trabalho. A barra lateral atualiza instantaneamente.",
+            font=ctk.CTkFont(size=11),
+            text_color="gray",
+            anchor="w",
+        ).pack(fill="x", padx=14, pady=(0, 10))
+
+        modules_list = module_manager.get_all_modules()
+        for mod in modules_list:
+            row = ctk.CTkFrame(mod_card, fg_color="transparent")
+            row.pack(fill="x", padx=14, pady=5)
+
+            info_frame = ctk.CTkFrame(row, fg_color="transparent")
+            info_frame.pack(side="left", fill="x", expand=True)
+
+            header_frame = ctk.CTkFrame(info_frame, fg_color="transparent")
+            header_frame.pack(anchor="w")
+
+            clean_icon = mod.icon.replace("\ufe0f", "")
+            ctk.CTkLabel(
+                header_frame,
+                text=f"{clean_icon}  {mod.title}",
+                font=ctk.CTkFont(size=13, weight="bold"),
+                anchor="w",
+            ).pack(side="left", padx=(0, 8))
+
+            if mod.is_core:
+                ctk.CTkLabel(
+                    header_frame,
+                    text="Essencial (Core)",
+                    font=ctk.CTkFont(size=10, weight="bold"),
+                    text_color="#3498db",
+                ).pack(side="left")
+            elif mod.requires_ffmpeg and not ffmpeg_manager.is_available():
+                ctk.CTkLabel(
+                    header_frame,
+                    text="⚠️ Requer FFmpeg",
+                    font=ctk.CTkFont(size=10, weight="bold"),
+                    text_color="#e67e22",
+                ).pack(side="left")
+
+            ctk.CTkLabel(
+                info_frame,
+                text=mod.description,
+                font=ctk.CTkFont(size=11),
+                text_color="gray",
+                anchor="w",
+            ).pack(anchor="w")
+
+            if mod.is_core:
+                switch = ctk.CTkSwitch(
+                    row,
+                    text="Ativo",
+                    state="disabled",
+                )
+                switch.select()
+                switch.pack(side="right", padx=(8, 0))
+            else:
+                switch = ctk.CTkSwitch(
+                    row,
+                    text="Ativo" if mod.enabled else "Inativo",
+                    command=lambda m=mod: self._toggle_module(m),
+                )
+                if mod.enabled:
+                    switch.select()
+                else:
+                    switch.deselect()
+                switch.pack(side="right", padx=(8, 0))
+                mod._switch_widget = switch
+
+        ctk.CTkFrame(mod_card, height=8, fg_color="transparent").pack()
+
         # Seção Aviso Legal / Isenção de Responsabilidade
         legal_card = ctk.CTkFrame(self.frame)
         legal_card.pack(fill="x", pady=(0, 16), padx=2)
@@ -239,3 +327,11 @@ class SettingsTab(BaseFeature):
             self.dir_entry.insert(0, chosen)
             config.set("output_dir", chosen)
             self.show_info("Pasta Atualizada", f"Nova pasta padrão:\n{chosen}")
+
+    def _toggle_module(self, mod):
+        """Alterna o estado de ativação de um módulo e notifica a interface."""
+        is_now_enabled = module_manager.toggle_module(mod.id)
+        if hasattr(mod, "_switch_widget") and mod._switch_widget is not None:
+            mod._switch_widget.configure(text="Ativo" if is_now_enabled else "Inativo")
+        status_str = "ativado" if is_now_enabled else "desativado"
+        self.show_info("Módulos Atualizados", f"O módulo '{mod.title}' foi {status_str}.")

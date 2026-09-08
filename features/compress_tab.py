@@ -16,6 +16,9 @@ class CompressTab(BaseFeature):
     title = "Compressor de Vídeo"
     icon = "📉"
     description = "Reduza o tamanho de vídeos com presets inteligentes para Discord, WhatsApp ou taxa CRF."
+    category = "Vídeo"
+    requires_ffmpeg = True
+    estimated_size_mb = 5.0
 
     def render(self, parent: ctk.CTkFrame) -> ctk.CTkFrame:
         self.frame = ctk.CTkScrollableFrame(parent, fg_color="transparent")

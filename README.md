@@ -56,7 +56,7 @@ Para compartilhar o aplicativo com outras pessoas que **não têm Python instala
 
 ### 1. Download Pronto (Releases do GitHub)
 Nas [Releases do GitHub](https://github.com/MigzuLCS/Media-MultiTool/releases), os usuários podem baixar diretamente:
-- **`Media-MultiTool-Setup.exe`**: Instalador clássico do Windows (instala sem precisar de permissões de administrador, cria atalhos no Menu Iniciar e Desktop, e adiciona desinstalador).
+- **`Media-MultiTool-Setup.exe`**: Instalador modular do Windows (permite selecionar exatamente quais módulos/ferramentas instalar no assistente, gerando um aplicativo sob medida, além de criar atalhos e desinstalador).
 - **`Media-MultiTool-Windows-x64.zip`**: Versão portátil (basta descompactar em qualquer pasta e abrir o `Media MultiTool.exe`).
 
 ### 2. Gerar Versão Portátil Localmente
@@ -113,25 +113,27 @@ class AudioDenoiseTab(BaseFeature):
 ```
 
 ### Passo 2: Registre sua ferramenta em `features/__init__.py`
-Abra `features/__init__.py` e adicione sua classe à lista `AVAILABLE_FEATURES`:
+Abra `features/__init__.py` e adicione sua classe à lista `ALL_FEATURES`:
 
 ```python
 from features.audio_denoise_tab import AudioDenoiseTab
 
-AVAILABLE_FEATURES = [
+ALL_FEATURES = [
     YouTubeTab,
     CompressTab,
     TrimTab,
     ConvertTab,
     AudioDenoiseTab,  # <-- Sua nova ferramenta!
+    DiskAnalyzerTab,
     SettingsTab,
 ]
 ```
 
 **Pronto!** O aplicativo cuidará automaticamente de:
-* Criar o botão de navegação na barra lateral.
-* Gerenciar a alternância de telas.
-* Preservar o estado da tela em segundo plano.
+* Registrar o novo módulo no `ModuleManager`.
+* Disponibilizar a ferramenta no assistente do instalador e na aba de Configurações.
+* Criar o botão de navegação dinamicamente na barra lateral.
+* Gerenciar a alternância de telas e lazy loading.
 
 ---
 

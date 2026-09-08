@@ -18,8 +18,11 @@ from core.tasks import task_manager
 class TrimTab(BaseFeature):
     id = "trim"
     title = "Corte Rápido"
-    icon = "✂️"
+    icon = "✂"
     description = "Corte trechos de vídeos instantaneamente sem perder qualidade ou com precisão de frame."
+    category = "Vídeo"
+    requires_ffmpeg = True
+    estimated_size_mb = 5.0
 
     def __init__(self, master: ctk.CTkFrame, main_window):
         super().__init__(master, main_window)

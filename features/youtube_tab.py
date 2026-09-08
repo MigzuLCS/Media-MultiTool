@@ -18,6 +18,10 @@ class YouTubeTab(BaseFeature):
     title = "Download de Mídia"
     icon = "📥"
     description = "Obtenha cópias de mídias online públicas ou autorizadas para arquivamento e reprodução offline."
+    category = "Download"
+    requires_ffmpeg = True
+    requires_ytdlp = True
+    estimated_size_mb = 15.0
 
     def render(self, parent: ctk.CTkFrame) -> ctk.CTkFrame:
         self.frame = ctk.CTkScrollableFrame(parent, fg_color="transparent")

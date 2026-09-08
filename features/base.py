@@ -13,6 +13,11 @@ class BaseFeature(ABC):
     title: str = "Ferramenta"
     icon: str = "⚙️"
     description: str = "Descrição da ferramenta"
+    category: str = "Geral"
+    is_core: bool = False
+    requires_ffmpeg: bool = False
+    requires_ytdlp: bool = False
+    estimated_size_mb: float = 0.0
 
     def __init__(self, master: ctk.CTkFrame, main_window):
         self.master = master

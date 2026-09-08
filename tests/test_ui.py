@@ -25,6 +25,31 @@ class TestMainWindow(unittest.TestCase):
         # Destrói a janela para liberar recursos
         app.destroy()
 
+    def test_selective_modules_and_reload(self):
+        from core.module_manager import module_manager
+
+        # Habilita apenas youtube, convert e settings (como solicitado pelo usuário)
+        module_manager.set_enabled_modules(["youtube", "convert", "settings"])
+
+        app = MainWindow()
+        active_ids = list(app.sidebar_buttons.keys())
+        self.assertIn("youtube", active_ids)
+        self.assertIn("convert", active_ids)
+        self.assertIn("settings", active_ids)
+        self.assertNotIn("compress", active_ids)
+        self.assertNotIn("trim", active_ids)
+        self.assertNotIn("disk_analyzer", active_ids)
+
+        # Ativar compressor dinamicamente
+        module_manager.enable_module("compress")
+        app.reload_sidebar()
+        self.assertIn("compress", app.sidebar_buttons)
+
+        # Restaurar todos os módulos para os demais testes
+        all_ids = [m.id for m in module_manager.get_all_modules()]
+        module_manager.set_enabled_modules(all_ids)
+        app.destroy()
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -52,9 +52,10 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 ; Copia os arquivos do aplicativo principal (excluindo a pasta bin se houver selecao especifica)
-Source: "..\dist\Media MultiTool\*"; DestDir: "{app}"; Excludes: "bin\*"; Flags: ignoreversion recursesubdirs createallsubdirs
-; Copia os binarios do FFmpeg quando selecionados pelo usuario
-Source: "..\dist\Media MultiTool\bin\*"; DestDir: "{app}\bin"; Components: engine_ffmpeg; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\dist\Media MultiTool\*"; DestDir: "{app}"; Excludes: "bin\*,_internal\bin\*"; Flags: ignoreversion recursesubdirs createallsubdirs
+; Copia os binarios do FFmpeg quando selecionados pelo usuario (da pasta dist ou da raiz bin do repo)
+Source: "..\bin\*"; DestDir: "{app}\bin"; Components: engine_ffmpeg; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
+Source: "..\dist\Media MultiTool\bin\*"; DestDir: "{app}\bin"; Components: engine_ffmpeg; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\assets\icon.ico"

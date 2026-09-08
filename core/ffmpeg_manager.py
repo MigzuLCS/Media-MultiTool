@@ -29,10 +29,14 @@ class FFmpegManager:
         if saved and Path(saved).exists():
             return str(saved)
 
-        # 2. Pasta bin/ local do app
+        # 2. Pasta bin/ local do app ou _internal/bin/
         local_exe = self.bin_dir / ("ffmpeg.exe" if sys.platform == "win32" else "ffmpeg")
         if local_exe.exists():
             return str(local_exe)
+
+        internal_exe = self.app_root / "_internal" / "bin" / ("ffmpeg.exe" if sys.platform == "win32" else "ffmpeg")
+        if internal_exe.exists():
+            return str(internal_exe)
 
         # 3. Variável PATH do sistema
         which_path = shutil.which("ffmpeg")

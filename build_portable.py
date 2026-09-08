@@ -1,4 +1,4 @@
-﻿import os
+import os
 import sys
 import shutil
 import zipfile
@@ -53,6 +53,13 @@ def build():
     if not output_app_dir.exists():
         print("[ERRO] Falha: diretório de saída não foi gerado.")
         sys.exit(1)
+
+    # Garantir que a pasta bin/ com ffmpeg fique na raiz do aplicativo distribuído
+    if bin_dir.exists() and any(bin_dir.iterdir()):
+        dest_bin = output_app_dir / "bin"
+        if not dest_bin.exists():
+            print("[INFO] Copiando pasta bin/ para dist/Media MultiTool/bin...")
+            shutil.copytree(bin_dir, dest_bin)
 
     # 3. Compactar em arquivo ZIP para distribuição
     zip_filename = f"Media-MultiTool-Windows-x64"
